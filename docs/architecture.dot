@@ -1,0 +1,68 @@
+digraph upbit_hft_bot {
+  rankdir=TB;
+  fontname="NanumGothic"; fontsize=11;
+  labelloc="t";
+  label="upbit-hft-bot — 프로젝트 구조 / architecture\l(bear-market defensive strategy: uptrend=hold BTC, downtrend=KRW cash)\l";
+  node [fontname="NanumGothic", fontsize=10, style="filled", shape=box];
+  edge [fontname="NanumGothic", fontsize=9, color="#555555"];
+
+  /* ---------- Data layer ---------- */
+  subgraph cluster_data {
+    label="데이터 / data (public, read-only)"; style="rounded,filled"; color="#eef4ff";
+    upbit   [label="Upbit 공개 API\n/v1/candles/* (read-only)", shape=cylinder, fillcolor="#cfe2ff"];
+    client  [label="src/upbit_client.py\nREST client (stdlib JWT)\npublic candles + private orders", fillcolor="#dbe7ff"];
+    refresh [label="backtest/refresh_data.py\n+ verify_data.py (무결성 검사)", fillcolor="#dbe7ff"];
+    csv     [label="data/*.csv\n(9년 검증된 일봉/4h)\n※ gitignored, refresh로 재생성", shape=note, fillcolor="#f5f5f5"];
+  }
+
+  /* ---------- Strategy core: SINGLE SOURCE OF TRUTH ---------- */
+  subgraph cluster_core {
+    label="전략 코어 / strategy core  —  SINGLE SOURCE OF TRUTH"; style="rounded,filled"; color="#eafbea";
+    config  [label="src/config.py\nBEAR 파라미터 · 리스크 한도\nLIVE_TRADING_ENABLED (기본 False)", fillcolor="#c9f0c9"];
+    regime  [label="src/regime.py\n장세 판별 (bull/bear)\nSMA200 · 고점대비 -20% + 버퍼", fillcolor="#bff0bf"];
+    strat   [label="src/bear_strategy.py\n타깃 포지션 (long/flat)\nlong_flat · breakout · breakout_regime", fillcolor="#a9e8a9"];
+  }
+
+  /* ---------- Risk envelope ---------- */
+  risk [label="src/risk.py — RiskManager (안전장치)\n총 노출 1,000,000 KRW 상한 · 건별 사이즈\n일일 손실 kill-switch · HALT 플래그", shape=octagon, fillcolor="#ffe0b3"];
+
+  /* ---------- Backtest ---------- */
+  subgraph cluster_bt {
+    label="백테스트 / backtest"; style="rounded,filled"; color="#f3ecff";
+    backtest [label="backtest/bear_backtest.py\n지표 · 매매로그 · ASCII 차트\n하락장 구간 성과 표", fillcolor="#e2d4ff"];
+    btout    [label="결과: maxDD 86.8% → 27.7%\n2018 약세장 -77.7% → 0.0%", shape=note, fillcolor="#f5f5f5"];
+  }
+
+  /* ---------- Live/dry-run engine + gating ---------- */
+  subgraph cluster_live {
+    label="실행 엔진 / live engine (기본 DRY-RUN)"; style="rounded,filled"; color="#fdecec";
+    engine [label="src/live_engine.py\n일 1회 판단 (idempotent)\n타깃 vs 현재 포지션 → 주문 1건", fillcolor="#f8cdcd"];
+    gate   [label="라이브 게이트 (4중, AND)\n1) LIVE_TRADING_ENABLED=True\n2) --live  3) \"TRADE LIVE\" 입력\n4) API 키 존재", shape=diamond, fillcolor="#ffb3b3"];
+    dry    [label="DRY-RUN (기본)\n주문 로그만 · 키 미사용 · 비공개 API 미호출", shape=note, fillcolor="#eaffea"];
+    liveord[label="LIVE 주문\nbuy_market / sell_market\n(게이트 모두 통과 시에만)", shape=note, fillcolor="#ffd6d6"];
+  }
+
+  tests [label="tests/\ntest_bear_strategy.py (22)\ntest_capital_cap.py (14)", shape=folder, fillcolor="#eeeeee"];
+
+  /* ---------- Edges ---------- */
+  upbit -> client;
+  client -> refresh -> csv;
+  csv -> backtest;
+  client -> engine [label="실시간 일봉", style=dashed];
+
+  config -> regime; regime -> strat;
+  strat -> backtest [label="같은 코드 공유", color="#2a7a2a", penwidth=2];
+  strat -> engine   [label="같은 코드 공유", color="#2a7a2a", penwidth=2];
+
+  backtest -> btout [style=dotted, arrowhead=none];
+
+  engine -> risk [label="사이즈/한도 확인", color="#cc7a00"];
+  risk -> engine [style=dashed, color="#cc7a00"];
+  engine -> gate;
+  gate -> dry     [label="아니오 (기본)", color="#2a7a2a", fontcolor="#2a7a2a"];
+  gate -> liveord [label="예 (모두 통과)", color="#cc0000", fontcolor="#cc0000"];
+  liveord -> client [label="private 주문", color="#cc0000", style=dashed];
+
+  tests -> strat [style=dotted, arrowhead=none, constraint=false];
+  tests -> gate  [style=dotted, arrowhead=none, constraint=false];
+}

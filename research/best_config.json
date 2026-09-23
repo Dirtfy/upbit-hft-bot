@@ -1,0 +1,174 @@
+{
+  "updated": "2026-09-23",
+  "last_cycle": 18,
+  "tradable_capital_cap": {
+    "added_cycle": 15,
+    "param": "config.BASE_TRADABLE_CAPITAL_KRW",
+    "default_krw": 1000000,
+    "rule": "sizing draws from min(MAX_EXPOSURE_KRW, min(base, free_balance)); profit above base is set aside and never re-risked (no compounding of profit)",
+    "drawdown_choice": "tradable = min(base, free_balance) \u2014 below base, trade the reduced balance (never deploy more than base, nor money not held); no separate lockbox that survives the account falling below base",
+    "wired": "RiskManager.tradable_capital()/protected_profit(); can_open(free_balance)/gap_capped_notional(free_balance); donchian_bot.py deploys min(BASE,cash) per entry for both books",
+    "tests": "tests/test_capital_cap.py 14/14 (profit accumulation, drawdown, replay capped 2,089,730 vs uncapped 280,520)",
+    "safety": "research/PAPER only; no live orders; keys untouched"
+  },
+  "forward_equity_anchor": {
+    "added_cycle": 14,
+    "anchor": "2026-09-12T00:00:00",
+    "why": "forward paper equity was recomputed over a sliding ~250-candle window, so a persisted equity value stepped when an old trade left the window (observed 2026-09-19: a 4h row jumped +11.0%->-0.4% with no trade). Now pinned: pre-anchor bars are warmup only; books start at CAPITAL/FLAT at the anchor, so equity(T) is stable across runs (verified: 0 mismatches on window-shift). Track regenerated from anchor; old sliding files in logs/paper_*.cycle13slide.bak.",
+    "forward_track_since_anchor": {
+      "daily": "+0.0% (7 rows, 0 trades \u2014 flat at anchor, no breakout yet)",
+      "4h": "+3.5% (45 rows, 1 open trade, LONG)"
+    }
+  },
+  "execution_model": "resting exchange-side stop orders (Cycle 13, DEFAULT): entry buy-stop at prior n_in-bar high, exit sell-stop at channel-low / ATR-trail; fill intrabar WITHOUT the agent -> outage-immune up to config.MAX_BLIND_HOURS (~5h). Legacy next-open fills ('--exec market') remain but are gap-exposed. Entry sizing gap-capped via RiskManager.gap_capped_notional so a blind-window drop cannot breach the daily loss limit.",
+  "gap_robustness_cycle13": {
+    "study": "backtest/cycle13_gap.py (9y, daily+4h)",
+    "worst_case_5h_outage": {
+      "daily": "CAGR 80.7->75.1% (-5.6pp), 1-bar slip",
+      "4h": "CAGR 94.5->75.5% (-19pp), Calmar 2.65->1.55, 2-bar slip"
+    },
+    "monte_carlo_5h": {
+      "4h": "-1.7pp @ ~1/wk, -10.6pp @ ~1/day",
+      "daily": "-3.4pp @ ~1/wk, -30.8pp @ ~1/day"
+    },
+    "mitigation_resting_stops": {
+      "4h": "CAGR 94.5->96.0%, Calmar ~2.62 (>=baseline AND outage-immune)",
+      "daily": "CAGR 80.7->60.2%, maxDD 48.5->44.3% (gap-proof, lower DD, gives back CAGR vs close-based ATR trail)",
+      "verdict": "ADOPTED as default execution"
+    },
+    "staleness_guard": "rejected as standalone (degenerates to 0 trades under a persistent outage); only a filter for occasional delays",
+    "reconciliation": "inherent \u2014 runner recomputes intended state from all closed candles each run, converges idempotently (self-heals a missed window without chasing)",
+    "risk_input": {
+      "MAX_BLIND_HOURS": 5.0,
+      "BLIND_WORST_MOVE": 0.13,
+      "adverse_5h_pctiles_4h": "median -0.5%, 1%ile -5.6%, 0.1%ile -13.4%, min -33%",
+      "cap": "naked notional <= DAILY_LOSS_LIMIT/BLIND_WORST_MOVE (~384k KRW); with a resting stop the bound is the stop distance. At the 200k/trade limit a 13% blind move = 26k < 50k limit, already gap-safe."
+    }
+  },
+  "forward_validation_power": {
+    "added_cycle": 11,
+    "forward_start_anchor": "2026-09-12",
+    "daily": {
+      "trades_per_yr": 4.8,
+      "mean_trade_pct": 19.5,
+      "std_pct": 50.4,
+      "N_star_95ci": 26,
+      "forward_years_to_validate": 5.4
+    },
+    "4h": {
+      "trades_per_yr": 23.9,
+      "mean_trade_pct": 3.4,
+      "std_pct": 12.0,
+      "N_star_95ci": 49,
+      "forward_years_to_validate": 2.1
+    },
+    "takeaway": "4h is the faster route to statistical confirmation (~2y vs ~5y) due to ~5x trade frequency; forward track is a live-execution/regime sanity check, the 9y walk-forward remains the primary edge evidence. See backtest/cycle11_power.py."
+  },
+  "current_best_strategy": "daily Donchian 20/20 + ATR(14) trail k=3 + optional volatility-target sizing (2%/day); 4h 30/20 validated co-best",
+  "objective": "maximize risk-adjusted return (Calmar = CAGR/maxDD), validated out-of-sample across regimes",
+  "dataset": {
+    "source": "Upbit official candle API (owner's exchange)",
+    "daily": "krw_btc_1d.csv \u2014 3283 bars, 2017-09-25..2026-09-20 (~9y; refreshed live Cycle 16)",
+    "4h": "krw_btc_4h_full.csv \u2014 19683 bars, 2017-09-26..2026-09-20T04:00 (~9y; refreshed live Cycle 16)",
+    "integrity": "verify_data.py: 0 dup/out-of-order; daily 0 gaps; 4h 3 missing candles (0.015%); OHLC sane; tz=UTC (+9h vs KST verified); extreme moves = real events (2020 COVID, 2017 bubble)",
+    "verified": true
+  },
+  "best_config": {
+    "family": "donchian_breakout",
+    "timeframe": "1D",
+    "market": "KRW-BTC",
+    "entry_channel_bars": 20,
+    "exit_channel_bars": 20,
+    "atr_trailing_stop": {
+      "atr_bars": 14,
+      "k": 3.0,
+      "added_cycle": 6
+    },
+    "volatility_target_sizing": {
+      "added_cycle": 8,
+      "wired_into_paper_bot_cycle": 9,
+      "target_daily_vol": 0.02,
+      "vol_lookback": 20,
+      "leverage": "none (fraction clipped to [0,1])",
+      "effect": "At the OOS-validated 2%/day: TEST Calmar 2.14->2.31, maxDD 19%->17%, CAGR ~flat. Cycle 10: paper runner aligned to 2%/day (was 2.5%); it now logs BOTH a full-exposure and a vol-target-sized paper equity side-by-side (equity_full_krw / equity_voltgt_krw) so the two can be compared as the forward track grows. Optional overlay, never scales above full exposure, 1M cap still the hard limit."
+    },
+    "direction": "long_only",
+    "fee_per_side": 0.0005,
+    "note": "Entry on break above prior 20-bar high; exit on break below prior 20-bar low OR an ATR(14) trailing stop at k=3 below the running high since entry (Cycle 6: improves risk-adjusted return, cuts maxDD, CAGR intact). Representative params \u2014 the FAMILY is robust but exact channel length drifts across folds; do not over-trust the point estimate. REGIME FILTER (SMA100/200) was tested and REJECTED (hurt returns)."
+  },
+  "best_metrics_cycle6_atr_trail_k3": {
+    "train_cagr_pct": 107,
+    "train_calmar": 2.2,
+    "train_maxdd_pct": 49,
+    "test_cagr_pct": 41,
+    "test_calmar": 2.14,
+    "test_maxdd_pct": 19,
+    "vs_base": "base 20/20 TEST Calmar 1.93 / maxDD 22% -> ATR-trail k3 TEST Calmar 2.14 / maxDD 19%"
+  },
+  "validated_alternative_4h": {
+    "family": "donchian_breakout",
+    "timeframe": "4h",
+    "entry_channel_bars": 30,
+    "exit_channel_bars": 20,
+    "test_cagr_pct": 47.5,
+    "test_calmar": 1.93,
+    "test_trades": 64,
+    "atr_trailing_stop": "TESTED Cycle 7 (single split) AND walk-forward (5 folds) \u2014 NOT adopted on 4h. k3 beat base in only 2/5 folds; k5 marginal/inert. Exit-design win from Cycle 6 is daily-specific. Keep 4h as plain Donchian 30/20.",
+    "note": "On the EXTENDED 9y 4h data this now validates OOS (Calmar 1.93) with ~4x more trades than daily -> statistically stronger. Cycle-3's '4h overfits' was a short-data artifact."
+  },
+  "best_metrics_train_test_split_70_30": {
+    "train_cagr_pct": 98.7,
+    "train_calmar": 1.88,
+    "test_cagr_pct": 42.6,
+    "test_calmar": 1.93,
+    "test_win_rate_pct": 54,
+    "test_avg_trade_pct": 8.5,
+    "buyhold_test_cagr_pct": 24.4
+  },
+  "robustness_cycle4": {
+    "walk_forward_folds_positive": "4/5",
+    "bear_protection": "2022 fold: strat -2.2% vs B&H -35.5%; 2025-26 fold: +0.8% vs -27.9%",
+    "per_year_bear": {
+      "2018": "strat -31% vs B&H -77.7%",
+      "2022": "strat -31.7% vs B&H -63.6%"
+    },
+    "full_9y": "strat +16313% vs B&H +2335% (43 trades)",
+    "interpretation": "Edge is real and concentrated in DOWNSIDE PROTECTION (avoids deep bear drawdowns), not long-BTC beta. Lags in raging bulls."
+  },
+  "caveats": [
+    "Single asset (BTC/KRW), long-only, low frequency (~5 trades/yr).",
+    "Optimal Donchian length drifts across folds; treat 20/20 as representative.",
+    "Daily open fills modeled with fee only (BTC/KRW daily liquidity is deep).",
+    "Past regimes may not repeat; still the strongest, most regime-robust result."
+  ],
+  "superseded": {
+    "scalping_mean_reversion": "Cycles 1-2: window120/z3/trend720. Break-even ceiling (-0.35% OOS), edge < fee. Abandoned for live use."
+  },
+  "paper_bot": "src/donchian_bot.py \u2014 research/PAPER-ONLY forward-runner. Fetches Upbit public candles, replays the strategy over closed candles (paper book = 1M KRW, next-open fills, 0.05%/side) and appends one row per closed candle to logs/paper_<tf>.csv (idempotent; re-run appends 0). Cycle 9: vol-target sizing wired in + current BUY intent gated by the shared RiskManager (HALT kill switch + 1M cap enforced; --mode paper only, no live path). Cycle 10: daily target aligned to 2%/day and the runner now logs TWO parallel books on the same signals \u2014 equity_full_krw (all-in) and equity_voltgt_krw (vol-target sized) \u2014 so full vs vol-target can be compared as the track grows (old 2.5%/single-column files kept as logs/paper_*.cycle9.bak). Cycle 13: DEFAULT execution switched to gap-robust RESTING stop orders (fills at levels intrabar, outage-immune; '--exec market' keeps legacy next-open); BUY intent now reports the resting buy-stop level + protective stop distance + gap-capped size; track regenerated in resting mode (old market track kept as logs/paper_*.cycle12market.bak). run_donchian_paper.sh runs both TFs (EXEC=market to override); cadence invocation-driven. Cycle 14: forward equity pinned to a fixed anchor (2026-09-12) so the persisted curve is stable across runs (was a sliding-window recompute that stepped when old trades left the window). Track SINCE ANCHOR (honest forward record): daily +0.0% / 0 trades (flat at anchor, no breakout yet); 4h +3.5% / 1 open trade (LONG). No keys.",
+  "live_status": "RESEARCH ONLY. config.STRAT (old scalping bot) is unchanged; the Donchian paper skeleton places NO orders. No live trading, account unfunded, 1,000,000 KRW cap and risk limits unchanged. Live wiring requires explicit owner authorisation in a future cycle.",
+  "data_sourcing": {
+    "added_cycle": 16,
+    "source": "live Upbit public API (api.upbit.com), read-only",
+    "canonical_client": "src/upbit_client.py \u2014 ticker/orderbook/candles_1m/candles_minutes/candles_days/candles_history (paginated); no keys",
+    "refresh_entrypoint": "backtest/refresh_data.py (pulls daily+4h live, runs verify_data.py)",
+    "datasets": "krw_btc_1d.csv (3283 rows->2026-09-20), krw_btc_4h_full.csv (19683 rows->2026-09-20T04:00), refreshed live; pre-refresh backups *.pre_refresh.bak",
+    "simulated_data": "none (only simulated ORDER FILLS in paper mode + Cycle-13 outage Monte-Carlo)",
+    "safety": "public read-only; no live-order/private path in paper runner; no hardcoded keys; account untouched"
+  },
+  "bear_market_strategy": {
+    "added_cycle": 18,
+    "note": "research/BEAR_MARKET_STRATEGY.md",
+    "asset": "KRW-BTC (Upbit spot, no shorting -> defensive/capital-preservation)",
+    "regime": "bear if close<SMA200 OR drawdown>=20% off trailing-year high; hysteresis (band, dd_exit)",
+    "params": "config.BEAR",
+    "variants": [
+      "long_flat",
+      "breakout",
+      "breakout_regime"
+    ],
+    "backtest": "backtest/bear_backtest.py (9y daily); maxDD B&H 86.8% -> breakout_regime 27.7%; 2018 bear -77.7% -> 0.0%, 2021-22 -73.5% -> -7.3%",
+    "live_engine": "src/live_engine.py DRY-RUN default; live gated by config.LIVE_TRADING_ENABLED(False)+--live+confirm+keys",
+    "tests": "tests/test_bear_strategy.py 22/22",
+    "safety": "research/paper only; no live orders; keys untouched; account unfunded"
+  }
+}
