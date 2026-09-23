@@ -886,3 +886,35 @@ LIVE_TRADING_ENABLED.
 tests/test_bear_strategy.py 22/22 (regime, targets, no-lookahead fill engine,
 gating) + existing tests/test_capital_cap.py 14/14 (no regression). README +
 OPERATIONS.md updated. best_config.json bumped to last_cycle=18.
+
+---
+
+## Cycle 19 (2026-09-23) — OWNER: published to GitHub + structure diagram + Korean report
+
+Owner mission (via secretary). Research/PAPER only; live OFF and gated; no keys
+committed; account untouched. Owner decision recorded: bear strategy stays
+DEFENSIVE only (loss-avoidance; no shorting/derivatives scope).
+
+**(1) GitHub publish** — created public repo **https://github.com/Dirtfy/upbit-hft-bot**
+(Dirtfy is a user account, not an org) via the A_Company git credential helper;
+pushed `main` (45 files). Korean repo description + README (code comments left in
+English per owner). SAFETY: hardened .gitignore to exclude AI-company scaffolding
+(CLAUDE.md, handoff/mission/prompt/report, leader.log, .claude/) and all runtime
+state (data/, logs/, *.HALT, *risk*.json, secrets.env); verified staged + remote
+trees are free of secrets/scaffolding (grep clean). secrets.env.example ships
+placeholders only.
+
+**(2) Structure diagram** — `docs/architecture.dot` -> `docs/architecture.png`
+(committed). Shows data layer, the shared strategy core (config/regime/
+bear_strategy) as SINGLE SOURCE OF TRUTH feeding BOTH backtest and live engine,
+the RiskManager envelope, and the 4-gate DRY-RUN vs LIVE flow. Rendered via
+render_diagram.sh; installed NanumGothic into ~/.fonts so Korean labels render
+(no CJK font was present). PNG for owner email: docs/architecture.png.
+
+**(3) Korean strategy report** — `docs/strategy_report_ko.md` (committed): what it
+does (상승장 BTC 보유 / 하락장 현금), bear detection (200일 MA / 1년 고점대비
+-20% + 되돌림 버퍼), headline backtest (MDD 86.8% -> 27.7%; 2018 -77.7% -> 0.0%),
+and the safety gating.
+
+No code/strategy logic changed this cycle; docs + packaging only. Tests remain
+22/22 + 14/14. best_config.json -> last_cycle=19.
