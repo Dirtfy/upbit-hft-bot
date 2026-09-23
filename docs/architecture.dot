@@ -1,68 +1,73 @@
-digraph upbit_hft_bot {
-  rankdir=TB;
-  fontname="NanumGothic"; fontsize=11;
+digraph upbit_hft_bot_runtime {
+  rankdir=LR;
+  fontname="NanumGothic"; fontsize=12;
   labelloc="t";
-  label="upbit-hft-bot — 프로젝트 구조 / architecture\l(bear-market defensive strategy: uptrend=hold BTC, downtrend=KRW cash)\l";
+  label="upbit-hft-bot — 기능/런타임 흐름도 (functional runtime view)\l하루 1회(cron) 판단: 정보 수집 → 매매 판단 → 주문 · 각 기능이 어떤 모듈로 구성되고 런타임에 어떻게 맞물리는지를 보여줌\l(폴더=기능 매핑 아님. 실제 데이터/제어 흐름 기준.)\l";
   node [fontname="NanumGothic", fontsize=10, style="filled", shape=box];
   edge [fontname="NanumGothic", fontsize=9, color="#555555"];
+  compound=true;
 
-  /* ---------- Data layer ---------- */
-  subgraph cluster_data {
-    label="데이터 / data (public, read-only)"; style="rounded,filled"; color="#eef4ff";
-    upbit   [label="Upbit 공개 API\n/v1/candles/* (read-only)", shape=cylinder, fillcolor="#cfe2ff"];
-    client  [label="src/upbit_client.py\nREST client (stdlib JWT)\npublic candles + private orders", fillcolor="#dbe7ff"];
-    refresh [label="backtest/refresh_data.py\n+ verify_data.py (무결성 검사)", fillcolor="#dbe7ff"];
-    csv     [label="data/*.csv\n(9년 검증된 일봉/4h)\n※ gitignored, refresh로 재생성", shape=note, fillcolor="#f5f5f5"];
+  /* ===================================================================== */
+  /* 기능 1 — 정보 수집 (data / info collection)                           */
+  /* ===================================================================== */
+  subgraph cluster_collect {
+    label="① 정보 수집 / data collection"; style="rounded,filled"; color="#eef4ff"; fontsize=13;
+
+    upbit_pub [label="Upbit 공개 API\nGET /v1/candles/days (read-only)", shape=cylinder, fillcolor="#cfe2ff"];
+    client_pub [label="src/upbit_client.py\ncandles_history() — 페이지네이션 REST\n(키 불필요, 공개 엔드포인트)", fillcolor="#dbe7ff"];
+    fetch [label="live_engine.fetch_closed_daily()\n마감된 일봉만 추출(진행중 봉 제외)\n→ OHLC 시계열(~600봉)", fillcolor="#dbe7ff"];
+
+    /* 백테스트/연구 경로: 같은 수집 기능의 오프라인 버전 */
+    refresh [label="[연구 경로] backtest/refresh_data.py\n+ verify_data.py (무결성 검사)\n→ data/*.csv (9년 일봉/4h)", shape=note, fillcolor="#eef0f5"];
   }
 
-  /* ---------- Strategy core: SINGLE SOURCE OF TRUTH ---------- */
-  subgraph cluster_core {
-    label="전략 코어 / strategy core  —  SINGLE SOURCE OF TRUTH"; style="rounded,filled"; color="#eafbea";
-    config  [label="src/config.py\nBEAR 파라미터 · 리스크 한도\nLIVE_TRADING_ENABLED (기본 False)", fillcolor="#c9f0c9"];
-    regime  [label="src/regime.py\n장세 판별 (bull/bear)\nSMA200 · 고점대비 -20% + 버퍼", fillcolor="#bff0bf"];
-    strat   [label="src/bear_strategy.py\n타깃 포지션 (long/flat)\nlong_flat · breakout · breakout_regime", fillcolor="#a9e8a9"];
+  /* ===================================================================== */
+  /* 기능 2 — 매매 판단 (trade decision)                                   */
+  /* ===================================================================== */
+  subgraph cluster_decide {
+    label="② 매매 판단 / trade decision  (전략 코어 = 백테스트와 공유)"; style="rounded,filled"; color="#eafbea"; fontsize=13;
+
+    config [label="src/config.py\nBEAR 파라미터 · 리스크 한도\nLIVE_TRADING_ENABLED(기본 False)", fillcolor="#c9f0c9"];
+    regime [label="src/regime.py\n장세 판별: SMA200 이탈 OR\n고점대비 −20% + 되돌림 버퍼\n→ bull / bear", fillcolor="#bff0bf"];
+    strat  [label="src/bear_strategy.py  targets()\n장세 → 목표 포지션(LONG/FLAT)\n★ SINGLE SOURCE OF TRUTH", fillcolor="#a9e8a9"];
+    decide [label="live_engine.decide_and_execute()\n목표 vs 현재 포지션 대조(reconcile)\n→ BUY · SELL · HOLD 중 1건", fillcolor="#c9f0c9"];
+    risk   [label="src/risk.py — RiskManager (안전장치)\ncan_open()/gap_capped_notional()로 사이즈 산정·veto\n총 노출 1,000,000 KRW 상한 · 건별 한도\n일일 손실 kill-switch · HALT 플래그", shape=octagon, fillcolor="#ffe0b3"];
   }
 
-  /* ---------- Risk envelope ---------- */
-  risk [label="src/risk.py — RiskManager (안전장치)\n총 노출 1,000,000 KRW 상한 · 건별 사이즈\n일일 손실 kill-switch · HALT 플래그", shape=octagon, fillcolor="#ffe0b3"];
+  /* ===================================================================== */
+  /* 기능 3 — 주문 (order execution)                                       */
+  /* ===================================================================== */
+  subgraph cluster_order {
+    label="③ 주문 / order execution  (기본 DRY-RUN)"; style="rounded,filled"; color="#fdecec"; fontsize=13;
 
-  /* ---------- Backtest ---------- */
-  subgraph cluster_bt {
-    label="백테스트 / backtest"; style="rounded,filled"; color="#f3ecff";
-    backtest [label="backtest/bear_backtest.py\n지표 · 매매로그 · ASCII 차트\n하락장 구간 성과 표", fillcolor="#e2d4ff"];
-    btout    [label="결과: maxDD 86.8% → 27.7%\n2018 약세장 -77.7% → 0.0%", shape=note, fillcolor="#f5f5f5"];
+    gate  [label="라이브 게이트 (4중 AND)\n1) LIVE_TRADING_ENABLED=True\n2) --live  3) \"TRADE LIVE\" 입력\n4) API 키 존재", shape=diamond, fillcolor="#ffb3b3"];
+    dry   [label="DRY-RUN (기본)\n낼 주문을 로그로만 기록\n키 미사용 · 비공개 API 미호출", shape=note, fillcolor="#eaffea"];
+    live  [label="LIVE 주문\nupbit_client.buy_market()/sell_market()\n→ Upbit 비공개 API (게이트 모두 통과 시)", fillcolor="#f8cdcd"];
+    state [label="logs/live_engine_state.json\n체결 후 포지션 기록(idempotent)\n= 다음 회차의 '현재 포지션'", shape=note, fillcolor="#f5f5f5"];
   }
 
-  /* ---------- Live/dry-run engine + gating ---------- */
-  subgraph cluster_live {
-    label="실행 엔진 / live engine (기본 DRY-RUN)"; style="rounded,filled"; color="#fdecec";
-    engine [label="src/live_engine.py\n일 1회 판단 (idempotent)\n타깃 vs 현재 포지션 → 주문 1건", fillcolor="#f8cdcd"];
-    gate   [label="라이브 게이트 (4중, AND)\n1) LIVE_TRADING_ENABLED=True\n2) --live  3) \"TRADE LIVE\" 입력\n4) API 키 존재", shape=diamond, fillcolor="#ffb3b3"];
-    dry    [label="DRY-RUN (기본)\n주문 로그만 · 키 미사용 · 비공개 API 미호출", shape=note, fillcolor="#eaffea"];
-    liveord[label="LIVE 주문\nbuy_market / sell_market\n(게이트 모두 통과 시에만)", shape=note, fillcolor="#ffd6d6"];
-  }
+  /* 백테스트: 같은 판단 코어를 과거 데이터에 재생 */
+  backtest [label="[검증] backtest/bear_backtest.py\n같은 regime+strategy 코어를 9년에 재생\n→ maxDD 86.8%→27.7%, 2018 −77.7%→0.0%", shape=note, fillcolor="#f3ecff"];
 
-  tests [label="tests/\ntest_bear_strategy.py (22)\ntest_capital_cap.py (14)", shape=folder, fillcolor="#eeeeee"];
+  /* ---------------- 런타임 흐름 (① → ② → ③) ---------------- */
+  upbit_pub -> client_pub -> fetch;
+  fetch -> regime [label="마감 일봉(OHLC)", lhead=cluster_decide, color="#2a6ac0", penwidth=1.6];
 
-  /* ---------- Edges ---------- */
-  upbit -> client;
-  client -> refresh -> csv;
-  csv -> backtest;
-  client -> engine [label="실시간 일봉", style=dashed];
+  config -> regime; regime -> strat; strat -> decide [label="목표 포지션"];
+  decide -> risk [label="사이즈 요청", color="#cc7a00"];
+  risk -> decide [label="허용 사이즈 / veto", style=dashed, color="#cc7a00"];
 
-  config -> regime; regime -> strat;
-  strat -> backtest [label="같은 코드 공유", color="#2a7a2a", penwidth=2];
-  strat -> engine   [label="같은 코드 공유", color="#2a7a2a", penwidth=2];
+  decide -> gate [label="주문 지시\n(side, 수량/금액)", lhead=cluster_order, color="#c02a2a", penwidth=1.6];
+  gate -> dry  [label="아니오(기본)", color="#2a7a2a", fontcolor="#2a7a2a"];
+  gate -> live [label="예(모두 통과)", color="#cc0000", fontcolor="#cc0000"];
+  dry  -> state [style=dashed];
+  live -> state;
 
-  backtest -> btout [style=dotted, arrowhead=none];
+  /* 피드백 루프: 저장된 포지션이 다음 회차 판단의 입력 */
+  state -> decide [label="다음 회차: 현재 포지션", style=dashed, color="#777777", constraint=false];
 
-  engine -> risk [label="사이즈/한도 확인", color="#cc7a00"];
-  risk -> engine [style=dashed, color="#cc7a00"];
-  engine -> gate;
-  gate -> dry     [label="아니오 (기본)", color="#2a7a2a", fontcolor="#2a7a2a"];
-  gate -> liveord [label="예 (모두 통과)", color="#cc0000", fontcolor="#cc0000"];
-  liveord -> client [label="private 주문", color="#cc0000", style=dashed];
-
-  tests -> strat [style=dotted, arrowhead=none, constraint=false];
-  tests -> gate  [style=dotted, arrowhead=none, constraint=false];
+  /* 오프라인/검증 경로 (연한 점선) */
+  client_pub -> refresh [style=dotted, color="#9aa0b0", arrowhead=none];
+  refresh -> backtest [style=dotted, color="#9a86c0"];
+  strat -> backtest [label="같은 판단 코어 공유", style=dotted, color="#9a86c0", constraint=false];
 }
