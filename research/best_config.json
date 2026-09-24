@@ -1,6 +1,6 @@
 {
-  "updated": "2026-09-23",
-  "last_cycle": 19,
+  "updated": "2026-09-24",
+  "last_cycle": 20,
   "tradable_capital_cap": {
     "added_cycle": 15,
     "param": "config.BASE_TRADABLE_CAPITAL_KRW",
@@ -168,7 +168,8 @@
     ],
     "backtest": "backtest/bear_backtest.py (9y daily); maxDD B&H 86.8% -> breakout_regime 27.7%; 2018 bear -77.7% -> 0.0%, 2021-22 -73.5% -> -7.3%",
     "live_engine": "src/live_engine.py DRY-RUN default; live gated by config.LIVE_TRADING_ENABLED(False)+--live+confirm+keys",
-    "tests": "tests/test_bear_strategy.py 22/22",
+    "data_staleness_guard": "added_cycle 20: config.MAX_CANDLE_STALENESS_HOURS=48; live_engine.candle_age_hours() flags a lagging feed; when stale the engine REFUSES new entries (never open fresh risk blind) but still allows protective exits (SELL) and HOLD. Asymmetric by design.",
+    "tests": "tests/test_bear_strategy.py 28/28",
     "safety": "research/paper only; no live orders; keys untouched; account unfunded"
   },
   "github": {

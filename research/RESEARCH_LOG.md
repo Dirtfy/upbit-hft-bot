@@ -918,3 +918,45 @@ and the safety gating.
 
 No code/strategy logic changed this cycle; docs + packaging only. Tests remain
 22/22 + 14/14. best_config.json -> last_cycle=19.
+
+---
+
+## Cycle 20 (2026-09-24 daily) — Data-staleness guard on the live engine
+
+Daily standing cycle. Research/PAPER only; live OFF and gated; no keys; account
+untouched/unfunded; 1M cap + all risk limits intact.
+
+**Gap found & closed.** The live engine (`src/live_engine.py`) decided off
+whatever the public API returned, with **no freshness check**. If the Upbit feed
+lags/outages, or the engine sits idle for days, it would still open a *new*
+position on stale market data — precisely when a defensive strategy should NOT be
+adding risk. Added a data-staleness guard:
+- `config.MAX_CANDLE_STALENESS_HOURS = 48.0` (a daily candle closes 24h after its
+  open; a healthy daily run sees a <24h-old close, so 48h allows one skipped day
+  of slack before flagging).
+- `live_engine.candle_age_hours()` — pure helper: hours since the last CLOSED
+  daily candle (open + 24h). Naive/UTC-stamped timestamps handled.
+- In `decide_and_execute`: when stale, log a WARNING and **refuse NEW entries**
+  (BUY), while **protective exits (SELL) and HOLD stay allowed** — reducing risk
+  is always safe even on an old candle. Asymmetric by design (never open fresh
+  risk blind; always able to get out).
+
+**Verified.** Unit tests added to `tests/test_bear_strategy.py` (now **28/28**):
+fresh ~6h candle under limit, ~102h candle over limit, one-skipped-day (~30h)
+within slack, naive-UTC handling. End-to-end (monkeypatched, no network): stale +
+LONG-target + FLAT ⇒ BUY refused (no state write); stale + FLAT-target + LONG ⇒
+protective SELL still flattens. Live DRY-RUN on fresh data (last_closed
+2026-09-23) shows no false trigger: regime=bear ⇒ FLAT ⇒ HOLD. capital-cap tests
+14/14 unchanged.
+
+**Forward track advanced** (idempotent paper runner, new candles captured):
+daily 12 rows, +3.4% (1 open LONG); 4h 73 rows, +7.5% (1 open LONG). Data
+refreshed live to 2026-09-24 (daily 3287 rows, 4h 19707 rows); integrity OK
+(only the long-known 2 pre-2018 extreme moves + 1 historical 4h gap flagged).
+
+**Also noted (prior turns, doc-only):** the Korean report gained an expected
+annual-return section (defensive CAGR +28.7% vs buy-and-hold +44.2% over the same
+9y, plus scenario-discounted forward estimate 8–15% base) and the architecture
+diagram was reworked into a functional/runtime view; both pushed to the repo.
+
+best_config.json -> last_cycle=20.

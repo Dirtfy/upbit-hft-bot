@@ -33,6 +33,15 @@ UPBIT_FEE = 0.0005               # 0.05% per side (KRW market)
 MAX_BLIND_HOURS = 5.0            # assume the bot can do nothing for up to this long
 BLIND_WORST_MOVE = 0.13         # conservative adverse move over a blind window (13%)
 
+# --- Data-freshness guard (live_engine). The daily engine decides off the most
+# recently CLOSED daily candle. If the public API returns stale candles (feed
+# outage / exchange lag) or the engine has not run for days, acting on stale
+# data is a real risk. A daily candle opened at T closes at T+24h, so on a
+# healthy daily run the freshest close is < 24h old; we allow one skipped day of
+# slack. Beyond this age the engine BLOCKS NEW ENTRIES (never open fresh risk on
+# stale data) but still permits protective exits (reducing risk is always safe).
+MAX_CANDLE_STALENESS_HOURS = 48.0
+
 # --- Strategy params (see backtest results; tune in one place) ---
 # Chosen from the targeted backtest (see research/BACKTEST_REPORT.md). This is
 # the most trade-dense config that stayed positive after fees (PF~1.05, 39

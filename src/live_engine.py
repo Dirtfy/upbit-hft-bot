@@ -29,7 +29,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
@@ -60,6 +60,21 @@ def fetch_closed_daily(client, count=600):
              "high": float(c["high_price"]), "low": float(c["low_price"]),
              "close": float(c["trade_price"])} for c in raw]     # oldest->newest
     return bars[:-1]                                   # drop the forming candle
+
+
+DAILY_CANDLE_HOURS = 24            # engine decides off CLOSED daily candles
+
+
+def candle_age_hours(candle_open_iso, now=None):
+    """Hours since the given DAILY candle closed. Upbit stamps a candle by its
+    OPEN time; a daily candle opened at T closes at T+24h. Returns age of that
+    close vs `now` (UTC). Used to detect a stale/lagging data feed."""
+    now = now or datetime.now(timezone.utc)
+    open_dt = datetime.fromisoformat(candle_open_iso)
+    if open_dt.tzinfo is None:
+        open_dt = open_dt.replace(tzinfo=timezone.utc)
+    close_dt = open_dt + timedelta(hours=DAILY_CANDLE_HOURS)
+    return (now - close_dt).total_seconds() / 3600.0
 
 
 def _load_state():
@@ -113,6 +128,18 @@ def decide_and_execute(args, live):
     log(f"mode={args.mode} last_closed={last['t']} close={last['close']:,.0f} "
         f"regime={regimes[-1]} -> target={'LONG' if target else 'FLAT'}")
 
+    # ---- data-freshness guard ----
+    # Never open fresh risk on stale market data (feed outage / exchange lag /
+    # engine idle for days). Protective exits stay allowed — reducing risk is
+    # always safe even if the last candle is old.
+    age_h = candle_age_hours(last["t"])
+    stale = age_h > config.MAX_CANDLE_STALENESS_HOURS
+    if stale:
+        log(f"[{('LIVE' if live else 'DRY-RUN')}] WARNING: data feed looks stale "
+            f"— latest closed candle is {age_h:.1f}h old "
+            f"(> {config.MAX_CANDLE_STALENESS_HOURS:.0f}h). New entries blocked; "
+            f"protective exits still allowed.")
+
     # ---- reconcile current position ----
     if live:
         pos, qty = current_live_position(client)
@@ -130,6 +157,11 @@ def decide_and_execute(args, live):
 
     # ---- one order at most ----
     if target == 1 and pos == 0:
+        if stale:
+            log(f"[{tag}] want BUY but data is stale: latest closed candle is "
+                f"{age_h:.1f}h old (> {config.MAX_CANDLE_STALENESS_HOURS:.0f}h "
+                f"limit) -> refusing new entry, HOLD until the feed is fresh.")
+            return
         try:
             notional = risk.can_open(free_balance=free_krw)   # respects cap+per-trade
         except RiskHalt as e:

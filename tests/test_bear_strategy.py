@@ -130,6 +130,31 @@ ok2, reasons2 = le.live_gates_ok(_ArgsNoLive())
 check("without --live, gates report the flag missing",
       any("--live" in x for x in reasons2))
 
+# ---- data-freshness guard (candle_age_hours) -----------------------------
+from datetime import datetime, timezone, timedelta  # noqa: E402
+
+_now = datetime(2026, 9, 24, 6, 0, 0, tzinfo=timezone.utc)
+# A daily candle opened 2026-09-23T00:00 closes 2026-09-24T00:00 -> ~6h old now.
+fresh_age = le.candle_age_hours("2026-09-23T00:00:00", now=_now)
+check("fresh candle age is ~6h", 5.0 < fresh_age < 7.0)
+check("fresh candle is under the staleness limit",
+      fresh_age <= config.MAX_CANDLE_STALENESS_HOURS)
+
+# Candle opened 2026-09-19 closed 2026-09-20T00:00 -> 4d6h = ~102h old -> stale.
+stale_age = le.candle_age_hours("2026-09-19T00:00:00", now=_now)
+check("~4-day-old candle age is ~102h", 101.0 < stale_age < 103.0)
+check("5-day-old candle exceeds the staleness limit",
+      stale_age > config.MAX_CANDLE_STALENESS_HOURS)
+
+# One skipped day is within slack: candle opened 2 days ago closed 1 day ago.
+skip_one = le.candle_age_hours("2026-09-22T00:00:00", now=_now)
+check("one skipped day (~30h) still within the 48h limit",
+      skip_one <= config.MAX_CANDLE_STALENESS_HOURS)
+
+# Naive ISO timestamps are treated as UTC (no tz on the candle string).
+check("naive candle timestamp handled as UTC (no crash, positive age)",
+      le.candle_age_hours("2026-09-23T00:00:00", now=_now) > 0)
+
 # ---- summary -------------------------------------------------------------
 failed = [n for n, ok in checks if not ok]
 print(f"\n{'ALL PASS' if not failed else 'FAILURES: ' + '; '.join(failed)} "
