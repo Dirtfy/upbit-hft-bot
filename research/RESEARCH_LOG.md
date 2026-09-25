@@ -960,3 +960,40 @@ annual-return section (defensive CAGR +28.7% vs buy-and-hold +44.2% over the sam
 diagram was reworked into a functional/runtime view; both pushed to the repo.
 
 best_config.json -> last_cycle=20.
+
+---
+
+## Cycle 21 (2026-09-25) — OWNER: official ~1-month paper-trading period + data-storage audit
+
+Owner mission (via secretary): formally run a ~1-month paper-trading period with a
+COMMITTED, human-readable record, and answer where market data is being stored /
+how it accumulates. Research/PAPER only; read-only public endpoints; no keys, no
+account, no live orders; 1M paper book + all risk limits intact.
+
+**(1) Committed paper-trading pipeline** — new `paper_trading/` (NOT gitignored):
+`paper_trader.py` runs the published defensive bear strategy forward on LIVE
+closed daily candles, marks a 1M paper account to market, and appends per cycle:
+`paper_log.jsonl` (machine ledger), `JOURNAL.md` (human-readable: regime/signal,
+virtual position, entry/exit rationale, per-cycle + cumulative P/L), and
+`market_data_daily.csv` (the day's OHLC — a small committed dataset for later
+backtesting of the paper window). Reuses the shared regime/strategy core (so the
+logged logic == the backtested logic) and the Cycle-20 staleness guard. Idempotent
+(resumes from the last logged candle; first run anchors at the latest closed
+candle, no backfill). Verified: BUY/SELL/HOLD transitions + P&L on a synthetic
+bull→crash replay (entered the ramp, exited +122k before the crash, capital
+protected); idempotent re-run appends 0. First real cycle: 2026-09-24, regime=bear
+(drawdown −35.3% off the 1y high dominates even though price sits ~11% above
+SMA200) → FLAT → defensive cash hold; equity 1,000,000 KRW (+0.00%).
+
+**(2) Data-storage audit (answer to the owner).** YES, we already store latest
+market data via `backtest/refresh_data.py` (live Upbit public API, read-only):
+`data/krw_btc_1d.csv` (daily OHLCV, 3288 rows → 2026-09-25) and
+`data/krw_btc_4h_full.csv` (4h OHLCV, ~19.7k rows), plus older 1m history. Fields:
+time_utc + OHLC + volume. LIMITATION: `data/` is gitignored (not in the public
+repo) and only refreshes when a cycle runs (~1/day). The daily bear strategy is
+fully served by once-a-day cadence (1 closed daily candle/day); finer-grained
+continuous accumulation (4h/1m/orderbook) would need a separate scheduler — see
+report.txt for the plan/options. The new committed `market_data_daily.csv` gives
+an auditable in-repo daily trail going forward.
+
+best_config.json -> last_cycle=21.
