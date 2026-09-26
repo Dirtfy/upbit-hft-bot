@@ -997,3 +997,39 @@ report.txt for the plan/options. The new committed `market_data_daily.csv` gives
 an auditable in-repo daily trail going forward.
 
 best_config.json -> last_cycle=21.
+
+---
+
+## Cycle 22 (2026-09-26 daily) — Harden the paper-trading pipeline + advance the record
+
+Daily standing cycle. Research/PAPER only; read-only public endpoints; no keys, no
+account, no live orders; 1M paper book + all risk limits intact.
+
+Chose to harden the just-launched official paper record (it will run unattended
+for ~1 month, so a silent regression would corrupt the owner-facing ledger) rather
+than only advance it a day:
+- **Mode-consistency guard** (`paper_trader.process`): the resumed account state is
+  mode-specific; continuing an existing record under a different `--mode` would
+  corrupt it. Now refused with a clear message (start a new record dir to switch).
+- **SUMMARY.md** — an at-a-glance rollup auto-regenerated from `paper_log.jsonl`
+  every run (period, current position, cumulative P/L, realized, equity
+  peak/trough, paper max-drawdown, trade counts, latest regime/action). Directly
+  serves the owner's "readable cumulative P/L" ask. `write_summary()` tolerates a
+  partial/legacy line instead of crashing (durability for a month of unattended runs).
+- **Automated tests** `tests/test_paper_trader.py` (**17/17**): synthetic
+  bull→crash replay asserts BUY/SELL/HOLD transitions, the mark-to-market and
+  cum-pnl identities, that the protective exit locks a positive realized pnl,
+  idempotency, the mode guard, SUMMARY contents, and the fresh-start anchor. No
+  network/keys. Full suite now 28/28 (bear) + 14/14 (capital) + 17/17 (paper).
+
+Record advanced to **cycle 2** (2026-09-25 candle): regime=bear (close ~10% above
+SMA200 but drawdown −36.2% off the 1y high dominates) → FLAT → defensive cash
+hold; equity 1,000,000 KRW (+0.00%). Verified the 09-25 daily candle is genuinely
+CLOSED (10.5h old at run time; real clock 2026-09-26T10:31Z), not a forming bar.
+
+Pending owner decision (from Cycle 21 report): data-accumulation cadence — keep
+daily-only (sufficient for the daily strategy) vs add a 4h schedule (option A) or a
+standalone 1m/orderbook collector (option B). Awaiting the owner's pick before
+building higher-frequency collection.
+
+best_config.json -> last_cycle=22.
