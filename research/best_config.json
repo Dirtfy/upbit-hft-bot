@@ -1,6 +1,6 @@
 {
   "updated": "2026-09-26",
-  "last_cycle": 22,
+  "last_cycle": 23,
   "tradable_capital_cap": {
     "added_cycle": 15,
     "param": "config.BASE_TRADABLE_CAPITAL_KRW",

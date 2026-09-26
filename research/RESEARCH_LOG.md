@@ -1033,3 +1033,44 @@ standalone 1m/orderbook collector (option B). Awaiting the owner's pick before
 building higher-frequency collection.
 
 best_config.json -> last_cycle=22.
+
+---
+
+## Cycle 23 (2026-09-26) — OWNER Option A: 4h candle accumulation added to the pipeline
+
+Owner picked Option A (from the Cycle-21 report): accumulate 4h candles alongside
+daily. Research/PAPER only; read-only public API; no keys, no account, no orders;
+1M cap + all risk limits intact.
+
+**Collector** `paper_trading/collect_4h.py` (+ `run_4h_collector.sh`): appends
+KRW-BTC 4h candles to a COMMITTED, gap-free trail `paper_trading/market_data_4h.csv`
+(time,OHLC,volume). Storage convention unchanged — full 9y 4h history stays in the
+gitignored `data/krw_btc_4h_full.csv` (via refresh_data.py); only the small forward
+trail is committed. Drops the forming candle; idempotent (appends only strictly-
+newer candles); first run bootstraps the trailing ~30 days (180 closed candles).
+Built-in integrity check after each run: duplicates / out-of-order / 4h-gap counts.
+
+**Gap-free by design (self-healing).** Each run backfills EVERY 4h candle closed
+since the last recorded one, so completeness holds at any cadence — even the
+once-a-day leader turn captures all 6 of that day's 4h candles. A true 4h cron only
+improves freshness, not completeness. Scheduling reality: no system `crontab`;
+session-based CronCreate jobs sleep between leader turns and expire in 7 days, so
+neither guarantees a 4h beat over a month. Decision: guarantee completeness via
+backfill (leader runs the collector each cycle) and document the exact crontab line
+(`7 */4 * * *`) + infra need (a persistent host with repo push) for optional
+intraday freshness. Reported to the owner.
+
+**4h paper track: deferred, kept separate.** The defensive regime filter is
+daily-calibrated (SMA200 over daily bars); applying it to 4h bars changes its
+meaning, so this step does 4h DATA accumulation only. A 4h paper track, if wanted,
+will use the 4h-validated Donchian 30/20 in its own ledger dir — never mixed into
+the daily `paper_log.jsonl` (mode-consistency guard preserved).
+
+**First accumulation status:** 180 closed 4h candles, 2026-08-27T08:00 →
+2026-09-26T04:00, integrity dups=0 / out-of-order=0 / gaps=0. Full 9y datasets
+refreshed live (daily 3289 rows → 2026-09-26; 4h 19720 rows; only the long-known 3
+pre-2019 4h gaps = 0.015%). Tests: new `tests/test_collect_4h.py` 11/11
+(bootstrap, idempotency, multi-candle backfill, gap detection); full suite 28/28 +
+14/14 + 17/17 + 11/11 = 70/70.
+
+best_config.json -> last_cycle=23.
