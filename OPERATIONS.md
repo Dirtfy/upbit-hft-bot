@@ -121,6 +121,42 @@ live without an explicit go-live instruction from the owner.
 Runtime state: dry-run position memory in `logs/live_engine_state.json`; risk
 state in `live_engine_risk.json`; log in `logs/live_engine.log`.
 
+## Autonomous-process operating model (owner directive 2026-09-27)
+
+**Principle: every "code" artifact — data collection now, the trading loop next —
+runs as its own OS process, independent of any Claude/leader turn. Claude spends
+tokens only when the owner commands a turn, and then it only READS those
+processes' output/logs/stored data to report and decide. Running the loop itself
+must never happen inside a leader turn.** Rationale: a leader turn is a Claude
+turn, which costs tokens; the whole point of "implement it in code" is that the
+process runs autonomously and cheaply without an LLM in the loop.
+
+**Live today — 4h data accumulation daemon.**
+```bash
+paper_trading/daemon_4h.sh {start|ensure|status|stop|restart|logs}
+```
+- Detached with `setsid` (reparents to PID 1), so it survives every turn boundary
+  and uses **zero Claude tokens** (verified `ppid=1`). Loops `collect_4h.py` every
+  4h, appends closed candles to the committed trail `paper_trading/market_data_4h.csv`.
+- Crash-resilient loop; gap-free idempotent backfill fills any downtime on the
+  next tick. Log: `logs/collect_4h_daemon.log`, PID: `logs/collect_4h_daemon.pid`.
+- **Keep-alive / restart:** no system cron or systemd exists in this env, so a
+  host reboot is the only thing that stops it. `daemon_4h.sh ensure` re-launches
+  it *only if* not already running (idempotent) — the leader calls this one line
+  at the start of a commanded turn (a liveness check, NOT accumulation). Optional
+  belt-and-suspenders company cron for reboot-proof restart is in
+  `paper_trading/README.md`.
+- **Commit split:** the daemon only appends locally; the leader commits/pushes the
+  accumulated trail on command (clean git history, no push races).
+
+**Next — move the trading loop to the same model.** `src/live_engine.py` /
+`paper_trading/paper_trader.py` will get the identical daemon wrapper
+(`setsid` detached loop + `ensure` self-heal + resilient loop + local-write /
+leader-commits-on-command). The leader turn will then only run `ensure` + read
+the ledger/log to report PnL — it will never drive the trading loop itself. All
+existing safety (paper-only default, 1,000,000 KRW cap, kill switch, live gating)
+is unchanged; a daemon does not relax any gate.
+
 ## Known limitations
 
 - Live maker-entry fill accounting uses the order's reported price/volume as an

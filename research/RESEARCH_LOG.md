@@ -1074,3 +1074,44 @@ pre-2019 4h gaps = 0.015%). Tests: new `tests/test_collect_4h.py` 11/11
 14/14 + 17/17 + 11/11 = 70/70.
 
 best_config.json -> last_cycle=23.
+
+## Cycle 24 (2026-09-27) — OWNER: data accumulation decoupled from Claude turns (autonomous daemon)
+
+Owner correction: running `collect_4h.py` once per **leader turn** (Cycle-23
+routine) was wrong — a leader turn is a Claude turn and costs tokens. The point of
+"implement it in code" is that collection runs as its own process, autonomously
+and cheaply, with no LLM in the loop; Claude should only READ its output when the
+owner commands a turn. Research/PAPER only; read-only public API; no keys, no
+account, no orders; 1M cap + all risk limits intact.
+
+**Built the autonomous daemon** `paper_trading/daemon_4h.sh {start|ensure|status|
+stop|restart|logs}`. It launches the 4h collector loop **detached** via `setsid`
++ `</dev/null`, so it drops off the harness and reparents to **PID 1** (the host
+orchestrator) — verified `ppid=1`. It therefore survives every leader-turn
+boundary and consumes **ZERO Claude tokens**. The host has multi-day uptime, so
+the daemon just keeps running. Loop calls `collect_4h.py` every 4h (UTC-aligned
++90s), appends closed candles to the committed trail `market_data_4h.csv`.
+
+**Kept alive / restart / logs / idempotent backfill.** Crash-resilient loop
+(collector runs in a subshell; one bad fetch logs a WARN and continues to the
+next tick). `sleep & wait` so TERM/INT stop it promptly. No system cron/systemd
+exists here, so a host reboot is the only thing that stops it; `daemon_4h.sh
+ensure` re-launches it *only if* not already running (idempotent liveness self-
+heal), and the gap-free backfill fills any downtime on the next tick. Log
+`logs/collect_4h_daemon.log`, PID `logs/collect_4h_daemon.pid`.
+
+**Removed collect_4h.py from the per-leader-turn routine** (README, OPERATIONS,
+memory updated). New leader routine: call `daemon_4h.sh ensure` (cheap liveness
+check, NOT accumulation), then read the trail/log and commit on command. Daemon
+only appends locally; leader publishes (git commit/push of `market_data_4h.csv`)
+on command — clean history, no daemon↔leader push races.
+
+**Operating model recorded for the future:** every code artifact — data
+collection now, the trading loop (`paper_trader.py` / `live_engine.py`) next —
+moves to this same detached-daemon + `ensure` self-heal pattern, so leader turns
+never drive a loop. Safety gates (paper-only default, 1M cap, kill switch, live
+gating) unchanged — a daemon relaxes no gate. Optional company cron for reboot-
+proof restart (`*/10 * * * * … daemon_4h.sh ensure`) documented in README.
+
+Tests unchanged and green: 28/28 + 14/14 + 17/17 + 11/11 = **70/70**.
+best_config.json -> last_cycle=24.

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # 4h candle accumulator wrapper — read-only public API, no keys, no orders.
 #
+# NOTE (2026-09-27): for standing accumulation prefer the autonomous DAEMON
+# `paper_trading/daemon_4h.sh` (runs detached, zero Claude tokens). This wrapper
+# is now just a single-shot manual/cron runner; the daemon is the superset.
+#
 # Gap-free by design: each run backfills every 4h candle closed since the last
 # recorded one, so completeness holds at ANY cadence (even once/day). Intended
 # uses:
