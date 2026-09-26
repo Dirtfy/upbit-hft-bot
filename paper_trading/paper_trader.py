@@ -44,6 +44,7 @@ from upbit_client import UpbitClient            # noqa: E402
 
 JSONL_PATH = os.path.join(HERE, "paper_log.jsonl")
 JOURNAL_PATH = os.path.join(HERE, "JOURNAL.md")
+SUMMARY_PATH = os.path.join(HERE, "SUMMARY.md")
 DATA_PATH = os.path.join(HERE, "market_data_daily.csv")
 START_CAPITAL = config.BASE_TRADABLE_CAPITAL_KRW      # 1,000,000 KRW paper book
 
@@ -102,8 +103,14 @@ def process(mode):
         start = len(bars) - 1
         cash, btc, entry = START_CAPITAL, 0.0, None
         realized_cum, cycle_no, equity_prev = 0.0, 0, START_CAPITAL
-        first_run = True
     else:
+        # the account state carries a mode-specific position; refuse to continue
+        # an existing record under a different mode (would corrupt the ledger).
+        if prev.get("mode") != mode:
+            print(f"REFUSING: existing record is mode={prev.get('mode')!r} but "
+                  f"--mode {mode!r} was requested. Keep one mode per record "
+                  f"(start a new record dir to switch).")
+            return 0
         last_t = prev["candle_t"]
         start = next((i for i, b in enumerate(bars) if b["t"] > last_t), len(bars))
         cash, btc = prev["cash_krw"], prev["btc_qty"]
@@ -197,11 +204,55 @@ def process(mode):
     print(f"appended {appended} cycle(s); latest {bars[-1]['t']} "
           f"equity {_fmt(equity_prev)} KRW "
           f"({rec['cum_return_pct']:+.2f}% cumulative) -> {JSONL_PATH}")
+    write_summary()
     age_h = le.candle_age_hours(bars[-1]["t"])
     if age_h > config.MAX_CANDLE_STALENESS_HOURS:
         print(f"NOTE: latest candle is {age_h:.1f}h old (> "
               f"{config.MAX_CANDLE_STALENESS_HOURS:.0f}h) — feed may be lagging.")
     return appended
+
+
+def write_summary():
+    """Regenerate SUMMARY.md — an at-a-glance rollup derived from the JSONL
+    ledger (deterministic; safe to call anytime)."""
+    if not os.path.exists(JSONL_PATH):
+        return
+    recs = [json.loads(l) for l in open(JSONL_PATH) if l.strip()]
+    if not recs:
+        return
+    first, last = recs[0], recs[-1]
+    n = len(recs)
+    buys = sum(1 for r in recs if r.get("action") == "BUY")
+    sells = sum(1 for r in recs if r.get("action") == "SELL")
+    days_long = sum(1 for r in recs if r.get("position_after") == "LONG")
+    # max drawdown of the paper equity curve
+    eqs = [r["equity_krw"] for r in recs if "equity_krw" in r]
+    peak, maxdd = -1e18, 0.0
+    for eq in eqs:
+        peak = max(peak, eq)
+        if peak > 0:
+            maxdd = max(maxdd, (peak - eq) / peak)
+    eq_peak, eq_trough = (max(eqs), min(eqs)) if eqs else (0.0, 0.0)
+    with open(SUMMARY_PATH, "w") as f:
+        f.write(
+            "# 모의투자 요약 (SUMMARY) — 자동 생성\n\n"
+            f"*`paper_log.jsonl`에서 재생성. 최종 갱신 봉: {last['candle_t']} · "
+            f"전략 모드 `{last['mode']}`. 가상 자본 시작 "
+            f"{_fmt(START_CAPITAL)} KRW.*\n\n"
+            "| 항목 | 값 |\n|---|---|\n"
+            f"| 기간 | {first['candle_t'][:10]} → {last['candle_t'][:10]} "
+            f"({n} 사이클) |\n"
+            f"| 현재 포지션 | **{last['position_after']}** |\n"
+            f"| 현재 평가액 | **{_fmt(last['equity_krw'])} KRW** |\n"
+            f"| 누적 손익 | **{last['cum_pnl_krw']:+,.0f} KRW "
+            f"({last['cum_return_pct']:+.2f}%)** |\n"
+            f"| 실현 손익(누적) | {last['realized_cum_krw']:+,.0f} KRW |\n"
+            f"| 평가액 고점 / 저점 | {_fmt(eq_peak)} / {_fmt(eq_trough)} KRW |\n"
+            f"| 모의 최대낙폭(MDD) | {maxdd:.2%} |\n"
+            f"| 매수 / 매도 / 보유중LONG | {buys} / {sells} / {days_long}일 |\n"
+            f"| 최근 장세·행동 | {last['regime']} · {last['action']} |\n\n"
+            "자세한 사이클별 근거·손익은 `JOURNAL.md`, 원장은 `paper_log.jsonl` 참조.\n"
+        )
 
 
 def _append_jsonl(rec):
