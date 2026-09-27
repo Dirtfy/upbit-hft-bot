@@ -123,39 +123,49 @@ state in `live_engine_risk.json`; log in `logs/live_engine.log`.
 
 ## Autonomous-process operating model (owner directive 2026-09-27)
 
-**Principle: every "code" artifact — data collection now, the trading loop next —
-runs as its own OS process, independent of any Claude/leader turn. Claude spends
-tokens only when the owner commands a turn, and then it only READS those
-processes' output/logs/stored data to report and decide. Running the loop itself
-must never happen inside a leader turn.** Rationale: a leader turn is a Claude
-turn, which costs tokens; the whole point of "implement it in code" is that the
-process runs autonomously and cheaply without an LLM in the loop.
+**Principle: every "code" artifact — data collection AND the trading loop — runs
+as its own OS process, independent of any Claude/leader turn. Claude spends tokens
+only when the owner commands a turn, and then it only READS those processes'
+output/logs/stored data to report and decide. Running a loop itself must never
+happen inside a leader turn.** Rationale: a leader turn is a Claude turn, which
+costs tokens; the whole point of "implement it in code" is that the process runs
+autonomously and cheaply without an LLM in the loop.
 
-**Live today — 4h data accumulation daemon.**
+**Shared machinery — `paper_trading/daemon_lib.sh`.** One reusable library gives
+every daemon: detached launch (`setsid`, reparents to PID 1 → survives turns, 0
+tokens), a crash-resilient loop, prompt stop via `sleep & wait` traps, and an
+idempotent `ensure` self-heal. Each daemon below is just a thin config (its tick
+command + its cadence). Adding the next one (e.g. the live engine) is ~30 lines.
+
+**Live daemons (both detached, verified `ppid=1`, zero Claude tokens):**
 ```bash
-paper_trading/daemon_4h.sh {start|ensure|status|stop|restart|logs}
+paper_trading/daemon_4h.sh    {start|ensure|status|stop|restart|logs}  # 4h data
+paper_trading/daemon_paper.sh {start|ensure|status|stop|restart|logs}  # daily paper cycle
 ```
-- Detached with `setsid` (reparents to PID 1), so it survives every turn boundary
-  and uses **zero Claude tokens** (verified `ppid=1`). Loops `collect_4h.py` every
-  4h, appends closed candles to the committed trail `paper_trading/market_data_4h.csv`.
-- Crash-resilient loop; gap-free idempotent backfill fills any downtime on the
-  next tick. Log: `logs/collect_4h_daemon.log`, PID: `logs/collect_4h_daemon.pid`.
-- **Keep-alive / restart:** no system cron or systemd exists in this env, so a
-  host reboot is the only thing that stops it. `daemon_4h.sh ensure` re-launches
-  it *only if* not already running (idempotent) — the leader calls this one line
-  at the start of a commanded turn (a liveness check, NOT accumulation). Optional
-  belt-and-suspenders company cron for reboot-proof restart is in
-  `paper_trading/README.md`.
-- **Commit split:** the daemon only appends locally; the leader commits/pushes the
-  accumulated trail on command (clean git history, no push races).
+- **4h collector** — loops `collect_4h.py` every 4h; appends closed candles to the
+  committed trail `paper_trading/market_data_4h.csv`. Gap-free idempotent backfill.
+  Log `logs/collect_4h_daemon.log`, PID `logs/collect_4h_daemon.pid`.
+- **Paper trader** — runs `paper_trader.py` once per closed daily candle (00:05 UTC);
+  appends one record to `paper_log.jsonl` / `JOURNAL.md` / `market_data_daily.csv`
+  and regenerates `SUMMARY.md`. The decision is deterministic strategy code
+  (`src/regime.py`+`bear_strategy.py`), not an LLM. Idempotent (only new closed
+  candles). Log `logs/paper_daemon.log`, PID `logs/paper_daemon.pid`. Mode override:
+  `PAPER_MODE=breakout_regime paper_trading/daemon_paper.sh start`.
+- **Keep-alive / restart:** no system cron or systemd exists here, so a host reboot
+  is the only thing that stops a daemon. `daemon_*.sh ensure` re-launches it *only
+  if* not already running (idempotent) — the leader calls these at the start of a
+  commanded turn (a liveness check, NOT the loop). Idempotent ticks fill any
+  reboot-downtime gap on the next run. Optional belt-and-suspenders company cron
+  for reboot-proof restart is in `paper_trading/README.md`.
+- **Commit split:** daemons only append locally; the leader commits/pushes the
+  accumulated record on command (clean git history, no push races).
 
-**Next — move the trading loop to the same model.** `src/live_engine.py` /
-`paper_trading/paper_trader.py` will get the identical daemon wrapper
-(`setsid` detached loop + `ensure` self-heal + resilient loop + local-write /
-leader-commits-on-command). The leader turn will then only run `ensure` + read
-the ledger/log to report PnL — it will never drive the trading loop itself. All
-existing safety (paper-only default, 1,000,000 KRW cap, kill switch, live gating)
-is unchanged; a daemon does not relax any gate.
+**Still leader-driven for now — going LIVE.** `src/live_engine.py` will get the
+same daemon wrapper when the owner authorises live trading; until then it stays
+off by default and gated (see below). All existing safety (paper-only default,
+1,000,000 KRW cap, kill switch, live gating) is unchanged; a daemon relaxes no
+gate. Tests: `tests/test_daemons.py` (9/9) exercises the shared lib lifecycle via
+a throwaway dummy daemon.
 
 ## Known limitations
 

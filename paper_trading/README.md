@@ -22,16 +22,32 @@
 포지션. `equity = 현금 + BTC평가액`, 사이클 손익 = 직전 대비 평가액 변화, 누적
 손익/수익률 = 시작 1,000,000 KRW 대비.
 
-## 실행
-```bash
-python3 paper_trading/paper_trader.py            # 기본 모드 long_flat
-python3 paper_trading/paper_trader.py --mode breakout_regime
-```
-**멱등(idempotent):** 마지막으로 기록한 봉 이후의 새 봉만 추가하므로 아무 때나
-다시 돌려도 안전하다. 첫 실행은 그 시점의 최신 마감 봉에서 시작(과거 백필 없음 —
-앞으로의 전진 기록).
+## 실행 — 자율 데몬 (오너 지시 2026-09-27, Cycle 25)
 
-일일 사이클 케이던스(하루 1회)면 일봉 1개/일이 정확히 축적된다.
+**핵심 원칙: 매매 루프도 리더(Claude) 턴 안에서 돌리지 않는다.** 일일 모의투자
+사이클은 Claude와 분리된 OS 데몬이 스스로 돌린다(4h 수집 데몬과 동일한 모델).
+결정 로직은 결정론적 전략 코드(`src/regime.py`+`bear_strategy.py`)라 LLM이 필요
+없다. Claude(리더)는 오너가 명령할 때만 원장/로그를 **읽고** 커밋만 한다.
+
+```bash
+# 데몬 제어 (리더 턴이 아니라 OS 프로세스로 상주 — 공유 라이브러리 daemon_lib.sh 사용)
+paper_trading/daemon_paper.sh start     # 분리(setsid)된 일일 모의투자 데몬 기동 — 멱등
+paper_trading/daemon_paper.sh ensure    # 죽어 있을 때만 재기동(호스트 리부트 자가치유)
+paper_trading/daemon_paper.sh status    # 생존/실행시간/최근 로그/최근 사이클 요약
+paper_trading/daemon_paper.sh stop|restart|logs
+# 모드 변경:  PAPER_MODE=breakout_regime paper_trading/daemon_paper.sh start
+```
+- 데몬은 마감된 일봉 1개마다(매일 00:05 UTC) `paper_trader.py`를 실행해 원장에
+  1행을 append하고 `SUMMARY.md`를 재생성한다. `paper_trader.py`가 공개 API로 시세를
+  직접 조회(keyless)하므로 데몬은 자기완결적이다.
+- **멱등(idempotent):** 마지막으로 기록한 봉 이후의 새 봉만 추가하므로 아무 때나
+  다시 돌려도 안전하다(다운타임/케이던스 무관 자가치유). 첫 기록은 그 시점의 최신
+  마감 봉에서 시작(과거 백필 없음 — 앞으로의 전진 기록).
+- **커밋 분리**: 데몬은 로컬 append만. git 커밋·푸시는 오너가 명령한 리더 턴이 수행.
+- 수동 단발 실행이 필요하면 여전히 `python3 paper_trading/paper_trader.py [--mode …]`.
+
+리부트-후-자동복구까지 원하면 4h 데몬과 동일하게 상시 호스트 크론 한 줄
+(`*/10 * * * * … daemon_paper.sh ensure`)을 건다(아래 4h 절 참조, `ensure`가 멱등).
 
 ## 4시간봉(4h) 축적 — 자율 데몬 (오너 지시 2026-09-27, Cycle 24)
 

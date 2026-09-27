@@ -1115,3 +1115,47 @@ proof restart (`*/10 * * * * … daemon_4h.sh ensure`) documented in README.
 
 Tests unchanged and green: 28/28 + 14/14 + 17/17 + 11/11 = **70/70**.
 best_config.json -> last_cycle=24.
+
+## Cycle 25 (2026-09-27 daily) — Trading loop moved to the autonomous-daemon model
+
+Daily standing cycle. Continues the owner directive (Cycle 24): no loop runs
+inside a leader (Claude) turn. Last cycle daemonized 4h DATA collection; this
+cycle daemonizes the DAILY PAPER cycle too, so the leader no longer runs
+`paper_trader.py` by hand either. Research/PAPER only; read-only public API; no
+keys, no account, no orders; 1M cap + all risk limits intact.
+
+**Refactor to a shared library** `paper_trading/daemon_lib.sh`: one sourced
+`daemon_main` provides the whole plumbing — detached launch (`setsid`, reparents
+to PID 1 → survives turns, 0 tokens), crash-resilient loop, prompt stop via
+`sleep & wait` traps, idempotent `ensure` self-heal, PID-reuse-safe liveness. Each
+daemon is now a thin config (tick command + cadence). `daemon_4h.sh` was rewritten
+onto the lib (behaviour identical; restarted and re-verified `ppid=1`, integrity
+0/0/0).
+
+**New paper daemon** `paper_trading/daemon_paper.sh`: runs `paper_trader.py` once
+per closed daily candle (wakes 00:05 UTC), appending one record to
+`paper_log.jsonl` / `JOURNAL.md` / `market_data_daily.csv` and regenerating
+`SUMMARY.md`. The "decision" is deterministic strategy code
+(`src/regime.py`+`bear_strategy.py`), not an LLM, and `paper_trader.py` fetches
+candles from the public API itself (keyless), so the daemon is self-contained and
+needs no Claude. Idempotent (only new closed candles) → any cadence/downtime
+self-heals. Mode override via `PAPER_MODE` env (default long_flat). Verified:
+detached `ppid=1`, first tick idempotent, next tick targets 2026-09-28T00:05 UTC,
+crash→`ensure` self-heal, prompt `stop`. Both daemons left RUNNING.
+
+**Standing-cycle work also done:** live data refreshed (daily 3290 rows →
+2026-09-27, 4h 19726); paper cycle 3 recorded for candle 2026-09-26 (regime bear,
+HOLD, FLAT, equity 1,000,000 KRW, +0.00%; SUMMARY = 3 cycles). The 4h daemon had
+already autonomously accumulated market_data_4h.csv to 186 rows (integrity
+0/0/0) across the day with zero leader involvement — the model working as intended.
+
+**Commit model unchanged:** daemons only append locally; the leader commits/pushes
+on command (clean history, no push races). **Still leader-driven:** going LIVE
+(`src/live_engine.py`) gets the same wrapper only on explicit owner authorisation;
+off-by-default + gated until then. A daemon relaxes no safety gate.
+
+Tests: new `tests/test_daemons.py` 9/9 (bash-syntax of all 3 scripts + full lib
+lifecycle — start/detach-to-PID-1/ensure-idempotent/crash-self-heal/stop — on a
+throwaway dummy daemon that never touches the production daemons or the live API).
+Full suite **79/79**: bear 28 + capital 14 + collect_4h 11 + daemons 9 + paper 17.
+best_config.json -> last_cycle=25.
