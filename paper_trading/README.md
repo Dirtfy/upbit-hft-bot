@@ -78,6 +78,12 @@ paper_trading/daemon_4h.sh logs      # 데몬 로그 tail
   데몬을 멈출 수 있다. `daemon_4h.sh ensure`가 "안 돌고 있을 때만" 재기동하는
   멱등 라이브니스 체크다. 리더는 명령받은 턴 시작 시 이 한 줄만 호출하면 된다
   (축적이 아니라 생존 확인 — 비용 거의 0). 리부트로 생긴 공백은 아래 백필이 메운다.
+  Cycle 26부터 `.claude/settings.json`의 SessionStart 훅이 Claude 세션이 시작될 때마다
+  `ensure`를 자동 실행한다(셸만, 토큰 0).
+- **장애 기록(outage ledger)**: 루프는 대기 중 300초마다 `logs/<name>_daemon.heartbeat`를
+  찍는다. `ensure`가 pidfile은 남아 있는데 프로세스가 죽은 경우(=정상 stop이 아닌 강제
+  종료)를 발견하면 마지막 하트비트·최대 다운타임을 `logs/daemon_outages.log`에 기록한다.
+  `status`에 하트비트 경과·기록된 장애가 표시된다.
 - **갭 없는 백필(self-healing)**: 매 틱이 "마지막 기록 이후 마감된 모든 4h봉"을
   백필하므로 다운타임/케이던스와 무관하게 완전하다.
 - **로그/상태**: `logs/collect_4h_daemon.log`, PID 파일 `logs/collect_4h_daemon.pid`.

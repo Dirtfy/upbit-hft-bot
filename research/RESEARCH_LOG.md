@@ -1159,3 +1159,34 @@ lifecycle — start/detach-to-PID-1/ensure-idempotent/crash-self-heal/stop — o
 throwaway dummy daemon that never touches the production daemons or the live API).
 Full suite **79/79**: bear 28 + capital 14 + collect_4h 11 + daemons 9 + paper 17.
 best_config.json -> last_cycle=25.
+
+## Cycle 26 — 2026-10-01 · daemon outage detection + auto self-heal on session start
+
+Daily standing cycle. Research/PAPER only; read-only public API; no keys, no
+account, no orders; 1M cap + all risk limits intact.
+
+**Finding:** at turn start both daemons were dead. They had been SIGKILLed
+together (no "stopping" line, pidfiles left behind) **twice**: 2026-09-30 between
+12:01Z and 15:21Z, and 2026-10-01 between 08:01Z and 10:34Z. The pattern fits the
+sandbox/container being recycled rather than a host reboot. **No data was lost**:
+backfill kept the 4h trail gap-free (210 rows, 0 dups / 0 out-of-order / 0 gaps,
+through 2026-10-01T04:00), and the paper ledger has every daily candle through
+2026-09-30 (7 cycles). But the outages were silent and only a leader turn could
+restart the daemons.
+
+**Fix (daemon_lib.sh, applies to every daemon):**
+- Heartbeat: the loop stamps `logs/<name>_daemon.heartbeat` every 300s while
+  sleeping, so an unclean death can be dated to within 5 min.
+- Outage ledger: `start`/`ensure` on a dead daemon whose pidfile is still there
+  (= no clean stop) appends `last_heartbeat` + `down_at_most` to
+  `logs/daemon_outages.log` and the daemon log. A clean stop removes the pidfile,
+  so a restart is never misreported as an outage. `status` shows heartbeat age and
+  the outages recorded. The two past outages were reconstructed from the logs.
+- Auto self-heal: a project SessionStart hook (`.claude/settings.json`, local
+  harness config, gitignored) runs both `ensure`s whenever any Claude session
+  starts here. It is shell only and costs 0 tokens.
+
+Production daemons were restarted cleanly on the new lib (detached, `ppid=1`).
+Paper state is unchanged: bear regime, FLAT, 1,000,000 KRW, +0.00% after 7 cycles.
+Tests: test_daemons 12/12 (heartbeat written, SIGKILL→outage recorded, clean
+stop→no outage). Full suite **82/82**. best_config.json -> last_cycle=26.

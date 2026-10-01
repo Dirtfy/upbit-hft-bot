@@ -151,10 +151,18 @@ paper_trading/daemon_paper.sh {start|ensure|status|stop|restart|logs}  # daily p
   (`src/regime.py`+`bear_strategy.py`), not an LLM. Idempotent (only new closed
   candles). Log `logs/paper_daemon.log`, PID `logs/paper_daemon.pid`. Mode override:
   `PAPER_MODE=breakout_regime paper_trading/daemon_paper.sh start`.
-- **Keep-alive / restart:** no system cron or systemd exists here, so a host reboot
-  is the only thing that stops a daemon. `daemon_*.sh ensure` re-launches it *only
-  if* not already running (idempotent) — the leader calls these at the start of a
-  commanded turn (a liveness check, NOT the loop). Idempotent ticks fill any
+- **Keep-alive / restart:** no system cron or systemd exists here. Observed
+  (Cycle 26): both daemons were SIGKILLed together twice (2026-09-30 ~12–15Z,
+  2026-10-01 ~08–10Z) — consistent with the sandbox/container being recycled,
+  not just a host reboot. `daemon_*.sh ensure` re-launches it *only if* not
+  already running (idempotent). It now runs **automatically on every Claude
+  session start** in this project (SessionStart hook in `.claude/settings.json`,
+  shell only, 0 tokens) as well as at the start of a commanded turn.
+- **Outage ledger:** the loop stamps `logs/<name>_daemon.heartbeat` every 300s
+  while sleeping. If `ensure` finds a dead daemon whose pidfile is still there
+  (= killed without a clean stop), it appends the window
+  (`last_heartbeat`, `down_at_most`) to `logs/daemon_outages.log` and to the
+  daemon log. `status` shows heartbeat age and the recorded outages. Idempotent ticks fill any
   reboot-downtime gap on the next run. Optional belt-and-suspenders company cron
   for reboot-proof restart is in `paper_trading/README.md`.
 - **Commit split:** daemons only append locally; the leader commits/pushes the

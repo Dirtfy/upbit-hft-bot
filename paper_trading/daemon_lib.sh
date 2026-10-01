@@ -18,7 +18,11 @@
 #
 # Guarantees provided here: detached launch (setsid, reparents to PID 1, survives
 # turns, 0 tokens), crash-resilient loop, prompt stop via `sleep & wait` traps,
-# idempotent `ensure` self-heal, PID-reuse-safe liveness check.
+# idempotent `ensure` self-heal, PID-reuse-safe liveness check, and outage
+# detection: the loop writes a heartbeat every HEARTBEAT_SECS while sleeping, so
+# when `ensure` finds a dead daemon whose pidfile is still there (= killed without
+# a clean stop, e.g. a container restart SIGKILLs everything) it records the
+# outage window to logs/daemon_outages.log instead of silently relaunching.
 # =============================================================================
 set -euo pipefail
 
@@ -26,9 +30,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)"
 cd "$ROOT"
 mkdir -p logs
 PY="$(command -v python3)"
+HEARTBEAT_SECS="${HEARTBEAT_SECS:-300}"
+OUTAGE_LOG="logs/daemon_outages.log"
 
 _dl_pidfile() { echo "logs/${DAEMON_NAME}_daemon.pid"; }
 _dl_log()     { echo "logs/${DAEMON_NAME}_daemon.log"; }
+_dl_hbfile()  { echo "logs/${DAEMON_NAME}_daemon.heartbeat"; }
 _dl_self()    { echo "$SELF"; }              # caller sets SELF="$0"
 _dl_tag()     { basename "$SELF"; }          # cmdline marker for PID-reuse guard
 
@@ -42,11 +49,35 @@ _dl_is_alive() {
   grep -q "$(_dl_tag)" "/proc/$pid/cmdline" 2>/dev/null
 }
 
+_dl_beat() { date -u +%s > "$(_dl_hbfile)"; }
+
+# Called by start/ensure when the daemon is NOT alive. A pidfile left behind means
+# the previous loop died without its TERM/INT trap running (SIGKILL / host or
+# container restart): record when it was last seen alive and how long it was down.
+_dl_record_outage() {
+  local pidfile hb now last down line
+  pidfile="$(_dl_pidfile)"
+  [ -f "$pidfile" ] || return 0
+  now=$(date -u +%s)
+  last="$(cat "$(_dl_hbfile)" 2>/dev/null || true)"
+  if [ -n "${last:-}" ]; then
+    down=$(( now - last ))
+    line="$(date -u +%FT%TZ) ${DAEMON_NAME} UNCLEAN_EXIT pid=$(cat "$pidfile" 2>/dev/null) last_heartbeat=$(date -u -d "@$last" +%FT%TZ) down_at_most=${down}s (~$(( down / 60 ))min)"
+  else
+    line="$(date -u +%FT%TZ) ${DAEMON_NAME} UNCLEAN_EXIT pid=$(cat "$pidfile" 2>/dev/null) last_heartbeat=unknown"
+  fi
+  echo "$line" >> "$OUTAGE_LOG"
+  echo "[$(date -u +%FT%TZ)] OUTAGE detected on relaunch: $line" >> "$(_dl_log)"
+  echo "OUTAGE: $line"
+  rm -f "$pidfile"
+}
+
 _dl_loop() {
   local pidfile; pidfile="$(_dl_pidfile)"
   echo "$$" > "$pidfile"
   trap 'echo "[$(date -u +%FT%TZ)] daemon stopping (signal)"; rm -f "'"$pidfile"'"; exit 0' TERM INT
   echo "[$(date -u +%FT%TZ)] daemon started pid=$$ ppid=$PPID name=${DAEMON_NAME}"
+  _dl_beat
   # First tick runs immediately so any downtime gap is backfilled on start.
   while true; do
     echo "[$(date -u +%FT%TZ)] --- ${DAEMON_NAME} tick ---"
@@ -55,9 +86,17 @@ _dl_loop() {
     fi
     local sleep_for; sleep_for="$(daemon_next_sleep)"
     echo "[$(date -u +%FT%TZ)] sleeping ${sleep_for}s until next tick"
-    # `sleep & wait` (not a bare sleep) so a TERM/INT trap fires promptly.
-    sleep "$sleep_for" &
-    wait $! || true
+    # Sleep in HEARTBEAT_SECS chunks, stamping a heartbeat after each, so an
+    # unclean death can later be dated to within one chunk. `sleep & wait` (not a
+    # bare sleep) so a TERM/INT trap fires promptly.
+    local left=$sleep_for chunk
+    while [ "$left" -gt 0 ]; do
+      chunk=$(( left < HEARTBEAT_SECS ? left : HEARTBEAT_SECS ))
+      sleep "$chunk" &
+      wait $! || true
+      left=$(( left - chunk ))
+      _dl_beat
+    done
   done
 }
 
@@ -73,6 +112,7 @@ daemon_main() {
         echo "${DAEMON_NAME} daemon already running (pid=$(cat "$pidfile")) — nothing to do (idempotent)"
         return 0
       fi
+      _dl_record_outage
       setsid "$SELF" __loop </dev/null >>"$log" 2>&1 &
       disown 2>/dev/null || true
       sleep 1
@@ -104,10 +144,13 @@ daemon_main() {
     status)
       if _dl_is_alive; then
         local pid; pid="$(cat "$pidfile")"
-        echo "STATUS: RUNNING  pid=$pid  uptime=$(ps -o etime= -p "$pid" 2>/dev/null | tr -d ' ')"
+        local hb; hb="$(cat "$(_dl_hbfile)" 2>/dev/null || echo "")"
+        echo "STATUS: RUNNING  pid=$pid  uptime=$(ps -o etime= -p "$pid" 2>/dev/null | tr -d ' ')  heartbeat_age=$([ -n "$hb" ] && echo "$(( $(date -u +%s) - hb ))s" || echo n/a)"
       else
         echo "STATUS: NOT running"
       fi
+      echo "--- recorded outages ($OUTAGE_LOG): $(cat "$OUTAGE_LOG" 2>/dev/null | grep -c " ${DAEMON_NAME} UNCLEAN_EXIT" || true) ---"
+      grep " ${DAEMON_NAME} UNCLEAN_EXIT" "$OUTAGE_LOG" 2>/dev/null | tail -n 3 || true
       echo "--- last 8 log lines ($log) ---"
       tail -n 8 "$log" 2>/dev/null || echo "(no log yet)"
       if declare -f daemon_status_extra >/dev/null; then
