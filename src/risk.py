@@ -25,7 +25,11 @@ class RiskHalt(Exception):
 
 
 class RiskManager:
-    def __init__(self, state_path):
+    def __init__(self, state_path, clock=None):
+        # clock: optional callable -> aware UTC datetime. Defaults to wall time;
+        # the shadow replay injects the replayed candle time so day rollover and
+        # the daily-loss window follow the replay, not the machine clock.
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.state_path = state_path
         self.halt_flag = state_path + ".HALT"
         self.s = {
@@ -37,7 +41,7 @@ class RiskManager:
         self._load()
 
     def _today(self):
-        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        return self.clock().strftime("%Y-%m-%d")
 
     def _load(self):
         if os.path.exists(self.state_path):
@@ -68,7 +72,7 @@ class RiskManager:
 
     def trip_halt(self, reason):
         with open(self.halt_flag, "w") as f:
-            f.write(f"{datetime.now(timezone.utc).isoformat()} {reason}\n")
+            f.write(f"{self.clock().isoformat()} {reason}\n")
 
     def clear_halt(self):
         if os.path.exists(self.halt_flag):

@@ -40,6 +40,20 @@ for f in ("daemon_lib.sh", "daemon_4h.sh", "daemon_paper.sh"):
     r = subprocess.run(["bash", "-n", p], capture_output=True, text=True)
     check(f"{f} passes `bash -n`", r.returncode == 0)
 
+# ---- tick lock: two concurrent writers run one after the other ----
+LOCKER = (
+    "import sys, time; sys.path.insert(0, %r); import tick_lock\n"
+    "with tick_lock.exclusive('selftest_tick'):\n"
+    "    t0 = time.time(); time.sleep(0.4); print(t0, time.time())\n") % PT
+procs = [subprocess.Popen([sys.executable, "-c", LOCKER], stdout=subprocess.PIPE,
+                          text=True) for _ in range(2)]
+spans = sorted(tuple(map(float, p.communicate()[0].split())) for p in procs)
+check("tick_lock serialises concurrent ticks (no overlap)",
+      len(spans) == 2 and spans[1][0] >= spans[0][1] - 1e-3)
+lockf = os.path.join(LOGS, "selftest_tick.lock")
+if os.path.exists(lockf):
+    os.remove(lockf)
+
 # Skip the live-lifecycle part where the OS primitives aren't available.
 if not (os.path.isdir("/proc") and shutil.which("setsid") and shutil.which("bash")):
     print("  [SKIP] lifecycle test (needs Linux /proc + setsid)")
@@ -55,6 +69,11 @@ pidfile = os.path.join(LOGS, f"{NAME}_daemon.pid")
 logfile = os.path.join(LOGS, f"{NAME}_daemon.log")
 hbfile = os.path.join(LOGS, f"{NAME}_daemon.heartbeat")
 outlog = os.path.join(LOGS, "daemon_outages.log")
+
+
+def rpid():
+    # pidfile holds "<host>/<pidns>:<pid>" (Cycle 27)
+    return int(open(pidfile).read().strip().rsplit(":", 1)[-1])
 
 
 def outages():
@@ -78,6 +97,7 @@ source "$(dirname "$SELF")/daemon_lib.sh"
 daemon_tick() { echo "selftest tick"; }
 daemon_next_sleep() { echo 3600; }
 HEARTBEAT_SECS=1
+HEARTBEAT_GRACE=2
 daemon_main "$@"
 '''
 
@@ -93,7 +113,7 @@ try:
         subprocess.run(["bash", dummy, "status"], cwd=ROOT,
                        capture_output=True, text=True).stdout.startswith("STATUS: RUNNING")
     check("dummy daemon starts and reports RUNNING", alive)
-    pid = int(open(pidfile).read().strip())
+    pid = rpid()
     ppid = subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)],
                           capture_output=True, text=True).stdout.strip()
     check("daemon is detached (reparented to PID 1)", ppid == "1")
@@ -106,7 +126,7 @@ try:
     # ensure while running -> idempotent no-op (pid unchanged)
     out = sh(dummy, "ensure").stdout
     check("ensure while running is a no-op", "already running" in out and
-          int(open(pidfile).read().strip()) == pid)
+          rpid() == pid)
 
     # crash -> not running
     os.kill(pid, 9)
@@ -123,7 +143,7 @@ try:
           len(rec) == 1 and "last_heartbeat=20" in rec[0]
           and "down_at_most=" in rec[0] and "OUTAGE:" in ens)
     st2 = sh(dummy, "status").stdout
-    new_pid = int(open(pidfile).read().strip()) if os.path.exists(pidfile) else -1
+    new_pid = rpid() if os.path.exists(pidfile) else -1
     check("ensure self-heals after crash", st2.startswith("STATUS: RUNNING")
           and new_pid not in (-1, pid))
 
@@ -133,6 +153,40 @@ try:
     check("stop halts daemon and clears pidfile",
           sh(dummy, "status").stdout.startswith("STATUS: NOT")
           and not os.path.exists(pidfile))
+
+    # ---- shared workspace, other PID namespace (Cycle 27) ----
+    FOREIGN = "otherhost/4026530000:4242"
+    def set_foreign(hb_age):
+        with open(pidfile, "w") as f:
+            f.write(FOREIGN + "\n")
+        with open(hbfile, "w") as f:
+            f.write(str(int(time.time()) - hb_age) + "\n")
+
+    set_foreign(0)
+    before = len(outages())
+    out = sh(dummy, "ensure").stdout
+    check("foreign-namespace owner with fresh heartbeat counts as alive (no duplicate, no outage)",
+          "already running" in out and open(pidfile).read().strip() == FOREIGN
+          and len(outages()) == before)
+    set_foreign(60)
+    out = sh(dummy, "ensure").stdout
+    time.sleep(1.2)
+    rec = outages()[before:]
+    check("foreign owner with stale heartbeat -> genuine outage recorded + relaunch here",
+          len(rec) == 1 and FOREIGN in rec[0] and "launched" in out
+          and sh(dummy, "status").stdout.startswith("STATUS: RUNNING"))
+    # a running loop retires itself once the pidfile names someone else
+    local_pid = rpid()
+    set_foreign(0)
+    time.sleep(2.5)
+    # PID 1 here does not reap orphans, so an exited loop may linger as a zombie
+    st = subprocess.run(["ps", "-o", "stat=", "-p", str(local_pid)],
+                        capture_output=True, text=True).stdout.strip()
+    gone = st == "" or st.startswith("Z")
+    check("loop exits by itself when superseded (pidfile names another owner)", gone)
+    out = sh(dummy, "stop").stdout
+    check("stop on a foreign-owned daemon removes the pidfile (owner retires itself)",
+          "another namespace" in out and not os.path.exists(pidfile))
 
     # clean stop -> a later start must NOT be logged as an outage
     before = len(outages())
@@ -146,7 +200,7 @@ finally:
     try:
         if os.path.exists(pidfile):
             try:
-                os.kill(int(open(pidfile).read().strip()), 9)
+                os.kill(rpid(), 9)
             except (ProcessLookupError, ValueError):
                 pass
     finally:

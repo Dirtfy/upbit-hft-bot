@@ -30,8 +30,10 @@ from datetime import datetime, timezone, timedelta
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
+sys.path.insert(0, HERE)
 import config                                   # noqa: E402
 from upbit_client import UpbitClient            # noqa: E402
+import tick_lock                                # noqa: E402  (serialises concurrent daemon ticks)
 
 TRAIL_PATH = os.path.join(HERE, "market_data_4h.csv")
 STEP_SEC = 4 * 3600                             # 4h candle spacing
@@ -137,7 +139,8 @@ def main():
                     help="on first run, seed the trail with the trailing N closed "
                          "4h candles (~30 days at 6/day). Default 180.")
     args = ap.parse_args()
-    collect(args.bootstrap)
+    with tick_lock.exclusive("collect_4h"):   # serialise concurrent daemons
+        collect(args.bootstrap)
 
 
 if __name__ == "__main__":

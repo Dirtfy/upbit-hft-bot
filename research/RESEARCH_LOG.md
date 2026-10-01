@@ -1190,3 +1190,48 @@ Production daemons were restarted cleanly on the new lib (detached, `ppid=1`).
 Paper state is unchanged: bear regime, FLAT, 1,000,000 KRW, +0.00% after 7 cycles.
 Tests: test_daemons 12/12 (heartbeat written, SIGKILL→outage recorded, clean
 stop→no outage). Full suite **82/82**. best_config.json -> last_cycle=26.
+
+## Cycle 27 — 2026-10-01 · counterfactual SHADOW REPLAY of the BUY→SELL path (owner-approved)
+
+Research/PAPER only. The official ledger is untouched (byte-identical, test-enforced).
+No network in the replay, no keys, no orders; limits unchanged (1M cap, 200k per
+trade, 50k daily loss).
+
+**Engine refactor:** the order path is now `live_engine.execute()`, shared by the
+CLI and the replay. `RiskManager` takes an injectable clock so the replay's day
+rollover follows replayed time.
+
+**Bugs found in the BUY/SELL path (fixed, regression-tested in tests/test_engine_execute.py):**
+1. LIVE SELL called `risk.record_close(0.0, 0.0)`. Open notional stayed at 200k
+   forever, so the next live BUY was vetoed for "no headroom" after 5 trades.
+   Worse, realized live losses were never booked, so **the daily-loss kill switch
+   could never fire in live**. Now SELL books the fee-inclusive estimated PnL and
+   releases the entry notional.
+2. LIVE BUY never persisted entry/qty, and DRY-RUN never touched the risk book.
+   The cap and kill switch were therefore untested outside unit tests. Dry-run
+   now uses its own risk file (`logs/live_engine_risk.dryrun.json`).
+3. DRY-RUN SELL PnL ignored fees; there was no slippage model. Now both fees are
+   included and `TAKER_SLIP_BPS` (1.5bp) is applied against us on each fill.
+4. A HALT flag blocked protective EXITS as well as entries. Now HALT and stale
+   data block new entries only; exits always go through (risk-reducing).
+
+**Shadow results** (`paper_trading/shadow/`; every record `counterfactual: true`):
+- A forced regime on real 4h data (211 decisions): 12 round trips, +11,668 KRW
+  net (fees 2,406, slippage 722).
+- B stress walk with synthetic -15% shocks: the kill switch tripped at -59,817 KRW
+  daily loss. Also fired: HALT blocks entry ×2 (including after day rollover),
+  exit allowed under HALT, stale-feed entry block. Net -58,340 KRW.
+- C genuine long_flat on real daily history 2023-01→2026-09: 10 round trips,
+  +224,827 KRW on 200k-per-trade sizing (fees 2,113). Losses were whipsaws in
+  2023/mid-2024; the gain came from the 2023-10→2024-05 trend.
+Max per-trade size was 200k and max open exposure 200k everywhere (cap respected).
+
+**Daemon finding:** the same workspace is mounted in ≥2 containers with separate
+PID namespaces. Each side saw the other's pidfile PID as "dead", which produced
+false UNCLEAN_EXIT entries (all of 10-01 10:40Z / 13:19Z / 13:20Z) and duplicate
+daemons. Fix: the pidfile now stores `<host>/<pidns>:<pid>`. A foreign owner
+counts as alive while the shared heartbeat is fresh (≤ 300+120s). A loop retires
+itself when the pidfile no longer names it. `stop` works across namespaces.
+`collect_4h.py`/`paper_trader.py` also take an fcntl tick lock
+(`paper_trading/tick_lock.py`) so concurrent ticks cannot double-append.
+Tests: daemons 17/17, engine_execute 18/18. Full suite **105/105**. best_config → last_cycle=27.

@@ -77,21 +77,28 @@ def candle_age_hours(candle_open_iso, now=None):
     return (now - close_dt).total_seconds() / 3600.0
 
 
-def _load_state():
-    if os.path.exists(STATE_PATH):
+RISK_PATH_LIVE = os.path.join(HERE, "live_engine_risk.json")
+# Dry-run keeps its own risk book so simulated fills exercise the cap / kill
+# switch exactly like live, without ever touching the live risk state.
+RISK_PATH_DRY = os.path.join(LOG_DIR, "live_engine_risk.dryrun.json")
+EMPTY_STATE = {"position": 0, "entry": None, "qty": 0.0, "notional": 0.0}
+
+
+def _load_state(path=STATE_PATH):
+    if os.path.exists(path):
         try:
-            with open(STATE_PATH) as f:
-                return json.load(f)
+            with open(path) as f:
+                return dict(EMPTY_STATE, **json.load(f))
         except Exception:
             pass
-    return {"position": 0, "entry": None, "qty": 0.0}
+    return dict(EMPTY_STATE)
 
 
-def _save_state(s):
-    tmp = STATE_PATH + ".tmp"
+def _save_state(s, path=STATE_PATH):
+    tmp = path + ".tmp"
     with open(tmp, "w") as f:
         json.dump(s, f)
-    os.replace(tmp, STATE_PATH)
+    os.replace(tmp, path)
 
 
 def live_gates_ok(args):
@@ -115,11 +122,121 @@ def current_live_position(client):
     return (1 if qty * px >= config.MIN_ORDER_KRW else 0), qty
 
 
+def round_trip_pnl(notional, qty, exit_px, fee=config.UPBIT_FEE):
+    """Realized KRW PnL of selling `qty` at `exit_px` that cost `notional` KRW to
+    buy. The buy fee is already inside notional (qty = notional*(1-fee)/px); the
+    sell fee comes off the proceeds."""
+    return qty * exit_px * (1 - fee) - notional
+
+
+def execute(target, last, *, risk, state_path, live=False, client=None,
+            free_krw=None, now=None, slip_bps=config.TAKER_SLIP_BPS, log=log):
+    """Reconcile `target` (0/1) against the current position for the latest
+    CLOSED candle `last` and place at most one order. Shared by the engine and
+    the shadow replay, so the replay exercises this exact code. Returns an event
+    dict (action, fill, fees, pnl, which risk path fired).
+
+    Dry-run fills at the candle close moved `slip_bps` against us (market order).
+    Live orders go to the exchange; fills are estimated the same way for the
+    risk book and reconciled by the account."""
+    tag = "LIVE" if live else "DRY-RUN"
+    ev = {"action": "HOLD", "risk_path": None}
+
+    # ---- data-freshness guard ----
+    # Never open fresh risk on stale market data (feed outage / exchange lag /
+    # engine idle for days). Protective exits stay allowed — reducing risk is
+    # always safe even if the last candle is old.
+    age_h = candle_age_hours(last["t"], now)
+    stale = age_h > config.MAX_CANDLE_STALENESS_HOURS
+    if stale:
+        log(f"[{tag}] WARNING: data feed looks stale "
+            f"— latest closed candle is {age_h:.1f}h old "
+            f"(> {config.MAX_CANDLE_STALENESS_HOURS:.0f}h). New entries blocked; "
+            f"protective exits still allowed.")
+
+    st = _load_state(state_path)
+    if live:
+        pos, qty = current_live_position(client)
+        free_krw, _ = client.balance("KRW")
+    else:
+        pos, qty = st["position"], st["qty"]
+        if free_krw is None:
+            free_krw = config.BASE_TRADABLE_CAPITAL_KRW   # assume the base in dry-run
+    halted = risk.is_halted()
+
+    if target == 1 and pos == 0:
+        # HALT and stale data block NEW risk only.
+        if halted:
+            log(f"[{tag}] want BUY but risk HALT flag present -> no entry. Clear "
+                f"{risk.halt_flag} to resume.")
+            ev["risk_path"] = "halt_blocked_entry"
+            return ev
+        if stale:
+            log(f"[{tag}] want BUY but data is stale: latest closed candle is "
+                f"{age_h:.1f}h old (> {config.MAX_CANDLE_STALENESS_HOURS:.0f}h "
+                f"limit) -> refusing new entry, HOLD until the feed is fresh.")
+            ev["risk_path"] = "stale_blocked_entry"
+            return ev
+        try:
+            notional = risk.can_open(free_balance=free_krw)   # respects cap+per-trade
+        except RiskHalt as e:
+            log(f"[{tag}] want BUY but risk vetoes: {e}")
+            ev["risk_path"] = f"veto: {e}"
+            return ev
+        px = last["close"] * (1 + slip_bps / 1e4)
+        filled_qty = notional * (1 - config.UPBIT_FEE) / px
+        if live:
+            resp = client.buy_market(config.MARKET, int(notional))
+            log(f"[LIVE] BUY market ~{notional:,.0f} KRW resp_uuid={resp.get('uuid')}")
+        else:
+            log(f"[DRY-RUN] would BUY ~{notional:,.0f} KRW (~{filled_qty:.8f} BTC "
+                f"@ ~{px:,.0f}); no order placed, no keys used")
+        risk.record_open(notional)
+        _save_state({"position": 1, "entry": px, "qty": filled_qty,
+                     "notional": notional}, state_path)
+        ev.update(action="BUY", fill=px, qty=filled_qty, notional=notional,
+                  fee=notional * config.UPBIT_FEE,
+                  slippage=filled_qty * (px - last["close"]))
+
+    elif target == 0 and pos == 1:
+        # Exits are always allowed (even under HALT / stale data): they reduce risk.
+        if halted:
+            ev["risk_path"] = "exit_allowed_under_halt"
+        elif stale:
+            ev["risk_path"] = "exit_allowed_on_stale_data"
+        px = last["close"] * (1 - slip_bps / 1e4)
+        # notional falls back to entry*qty for state files written before Cycle 27
+        notional = st["notional"] or (st["entry"] or px) * qty
+        pnl = round_trip_pnl(notional, qty, px)
+        if live:
+            resp = client.sell_market(config.MARKET, qty)
+            log(f"[LIVE] SELL market {qty:.8f} BTC resp_uuid={resp.get('uuid')} "
+                f"(est. pnl ~{pnl:+,.0f} KRW; account reconciles)")
+        else:
+            log(f"[DRY-RUN] would SELL {qty:.8f} BTC @ ~{px:,.0f} "
+                f"(paper pnl ~{pnl:+,.0f} KRW after fees); no order placed, "
+                f"no keys used")
+        risk.record_close(notional, pnl)
+        _save_state(dict(EMPTY_STATE), state_path)
+        ev.update(action="SELL", fill=px, qty=qty, notional=notional, pnl=pnl,
+                  fee=qty * px * config.UPBIT_FEE,
+                  slippage=qty * (last["close"] - px))
+        if risk.is_halted() and not halted:
+            ev["risk_path"] = "kill_switch_tripped"
+            log(f"[{tag}] daily loss limit hit -> HALT flag written "
+                f"({risk.halt_flag}); no new entries until it is cleared.")
+
+    else:
+        log(f"[{tag}] HOLD — position already {'LONG' if pos else 'FLAT'}, "
+            f"target {'LONG' if target else 'FLAT'}; no order")
+    return ev
+
+
 def decide_and_execute(args, live):
     p = dict(config.BEAR)
     # keys only touched in genuine live mode; public client otherwise
     client = UpbitClient(*config.load_keys()) if live else UpbitClient("", "")
-    risk = RiskManager(os.path.join(HERE, "live_engine_risk.json"))
+    risk = RiskManager(RISK_PATH_LIVE if live else RISK_PATH_DRY)
 
     bars = fetch_closed_daily(client)
     regimes = compute_regimes(bars, p)
@@ -127,76 +244,8 @@ def decide_and_execute(args, live):
     last = bars[-1]
     log(f"mode={args.mode} last_closed={last['t']} close={last['close']:,.0f} "
         f"regime={regimes[-1]} -> target={'LONG' if target else 'FLAT'}")
-
-    # ---- data-freshness guard ----
-    # Never open fresh risk on stale market data (feed outage / exchange lag /
-    # engine idle for days). Protective exits stay allowed — reducing risk is
-    # always safe even if the last candle is old.
-    age_h = candle_age_hours(last["t"])
-    stale = age_h > config.MAX_CANDLE_STALENESS_HOURS
-    if stale:
-        log(f"[{('LIVE' if live else 'DRY-RUN')}] WARNING: data feed looks stale "
-            f"— latest closed candle is {age_h:.1f}h old "
-            f"(> {config.MAX_CANDLE_STALENESS_HOURS:.0f}h). New entries blocked; "
-            f"protective exits still allowed.")
-
-    # ---- reconcile current position ----
-    if live:
-        pos, qty = current_live_position(client)
-        free_krw, _ = client.balance("KRW")
-    else:
-        st = _load_state()
-        pos, qty = st["position"], st.get("qty", 0.0)
-        free_krw = config.BASE_TRADABLE_CAPITAL_KRW    # assume the base in dry-run
-
-    tag = "LIVE" if live else "DRY-RUN"
-    if risk.is_halted():
-        log(f"[{tag}] risk HALT flag present -> no action. Clear "
-            f"{risk.halt_flag} to resume.")
-        return
-
-    # ---- one order at most ----
-    if target == 1 and pos == 0:
-        if stale:
-            log(f"[{tag}] want BUY but data is stale: latest closed candle is "
-                f"{age_h:.1f}h old (> {config.MAX_CANDLE_STALENESS_HOURS:.0f}h "
-                f"limit) -> refusing new entry, HOLD until the feed is fresh.")
-            return
-        try:
-            notional = risk.can_open(free_balance=free_krw)   # respects cap+per-trade
-        except RiskHalt as e:
-            log(f"[{tag}] want BUY but risk vetoes: {e}")
-            return
-        px = last["close"]
-        if live:
-            resp = client.buy_market(config.MARKET, int(notional))
-            log(f"[LIVE] BUY market ~{notional:,.0f} KRW resp_uuid={resp.get('uuid')}")
-            filled_qty = notional * (1 - config.UPBIT_FEE) / px
-            risk.record_open(notional)
-        else:
-            filled_qty = notional * (1 - config.UPBIT_FEE) / px
-            log(f"[DRY-RUN] would BUY ~{notional:,.0f} KRW (~{filled_qty:.8f} BTC "
-                f"@ ~{px:,.0f}); no order placed, no keys used")
-            _save_state({"position": 1, "entry": px, "qty": filled_qty})
-
-    elif target == 0 and pos == 1:
-        if live:
-            resp = client.sell_market(config.MARKET, qty)
-            log(f"[LIVE] SELL market {qty:.8f} BTC resp_uuid={resp.get('uuid')}")
-            # realized pnl is reconciled by the account; record a flat close
-            risk.record_close(0.0, 0.0)
-        else:
-            st = _load_state()
-            px = last["close"]
-            entry = st.get("entry") or px
-            pnl = (px - entry) * qty
-            log(f"[DRY-RUN] would SELL {qty:.8f} BTC @ ~{px:,.0f} "
-                f"(paper pnl ~{pnl:+,.0f} KRW); no order placed, no keys used")
-            _save_state({"position": 0, "entry": None, "qty": 0.0})
-
-    else:
-        log(f"[{tag}] HOLD — position already {'LONG' if pos else 'FLAT'}, "
-            f"target {'LONG' if target else 'FLAT'}; no order")
+    execute(target, last, risk=risk, state_path=STATE_PATH, live=live,
+            client=client)
 
 
 def confirm_live():

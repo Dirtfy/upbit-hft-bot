@@ -119,7 +119,17 @@ gates the original `bot.py --live`. The account is **unfunded**; do not enable
 live without an explicit go-live instruction from the owner.
 
 Runtime state: dry-run position memory in `logs/live_engine_state.json`; risk
-state in `live_engine_risk.json`; log in `logs/live_engine.log`.
+state in `live_engine_risk.json` (live) / `logs/live_engine_risk.dryrun.json`
+(dry-run; dry-run fills now go through the same RiskManager so the cap and kill
+switch behave exactly as live); log in `logs/live_engine.log`. The order path is
+`live_engine.execute()`. A HALT flag (or stale data) blocks NEW entries only;
+protective exits always go through.
+
+**Counterfactual shadow replay (Cycle 27).** `python3 paper_trading/shadow/shadow_replay.py`
+drives `execute()` + `RiskManager` in dry-run over real data with a forced regime,
+a synthetic stress walk, and a historical replay. It uses throwaway temp state and
+writes only `paper_trading/shadow/` (every record `counterfactual: true`). It never
+touches the official paper ledger. It is a one-off research tool, not a daemon.
 
 ## Autonomous-process operating model (owner directive 2026-09-27)
 

@@ -23,6 +23,15 @@
 # when `ensure` finds a dead daemon whose pidfile is still there (= killed without
 # a clean stop, e.g. a container restart SIGKILLs everything) it records the
 # outage window to logs/daemon_outages.log instead of silently relaunching.
+#
+# Shared workspace, several containers (Cycle 27): the same checkout is mounted
+# in more than one container, each with its own PID namespace, so a bare PID in
+# the pidfile is meaningless to the other side (it always looked "dead", which
+# produced false outages and duplicate daemons). The pidfile therefore records
+# "<host>/<pidns>:<pid>". A loop owned by THIS namespace is checked with kill -0;
+# one owned by another namespace counts as alive while the shared heartbeat is
+# fresh. A loop exits by itself as soon as the pidfile no longer names it, so
+# `stop` works across namespaces and a racing duplicate retires itself.
 # =============================================================================
 set -euo pipefail
 
@@ -31,6 +40,7 @@ cd "$ROOT"
 mkdir -p logs
 PY="$(command -v python3)"
 HEARTBEAT_SECS="${HEARTBEAT_SECS:-300}"
+HEARTBEAT_GRACE="${HEARTBEAT_GRACE:-120}"    # slack on top of one chunk (tick time)
 OUTAGE_LOG="logs/daemon_outages.log"
 
 _dl_pidfile() { echo "logs/${DAEMON_NAME}_daemon.pid"; }
@@ -39,14 +49,42 @@ _dl_hbfile()  { echo "logs/${DAEMON_NAME}_daemon.heartbeat"; }
 _dl_self()    { echo "$SELF"; }              # caller sets SELF="$0"
 _dl_tag()     { basename "$SELF"; }          # cmdline marker for PID-reuse guard
 
-_dl_is_alive() {
-  local pidfile; pidfile="$(_dl_pidfile)"
-  [ -f "$pidfile" ] || return 1
-  local pid; pid="$(cat "$pidfile" 2>/dev/null || true)"
+_dl_ns()    { echo "$(hostname)/$(readlink /proc/self/ns/pid 2>/dev/null | tr -dc '0-9')"; }
+_dl_owner() { cat "$(_dl_pidfile)" 2>/dev/null || true; }
+
+# PID of the recorded loop if it lives in THIS namespace (legacy bare PIDs are
+# treated as local candidates), else empty.
+_dl_local_pid() {
+  local tok; tok="$(_dl_owner)"
+  case "$tok" in
+    "$(_dl_ns):"*) echo "${tok##*:}" ;;
+    *:*)           ;;
+    *)             echo "$tok" ;;
+  esac
+}
+
+_dl_local_alive() {
+  local pid; pid="$(_dl_local_pid)"
   [ -n "${pid:-}" ] || return 1
   kill -0 "$pid" 2>/dev/null || return 1
   # confirm it is really OUR loop (guard against PID reuse)
   grep -q "$(_dl_tag)" "/proc/$pid/cmdline" 2>/dev/null
+}
+
+_dl_hb_age() {
+  local hb; hb="$(cat "$(_dl_hbfile)" 2>/dev/null || true)"
+  [ -n "${hb:-}" ] && echo $(( $(date -u +%s) - hb )) || echo 999999999
+}
+
+_dl_is_alive() {
+  local tok; tok="$(_dl_owner)"
+  [ -n "${tok:-}" ] || return 1
+  case "$tok" in
+    "$(_dl_ns):"*) _dl_local_alive ;;
+    *:*)           [ "$(_dl_hb_age)" -le $(( HEARTBEAT_SECS + HEARTBEAT_GRACE )) ] ;;
+    *)             _dl_local_alive || \
+                   [ "$(_dl_hb_age)" -le $(( HEARTBEAT_SECS + HEARTBEAT_GRACE )) ] ;;
+  esac
 }
 
 _dl_beat() { date -u +%s > "$(_dl_hbfile)"; }
@@ -62,9 +100,9 @@ _dl_record_outage() {
   last="$(cat "$(_dl_hbfile)" 2>/dev/null || true)"
   if [ -n "${last:-}" ]; then
     down=$(( now - last ))
-    line="$(date -u +%FT%TZ) ${DAEMON_NAME} UNCLEAN_EXIT pid=$(cat "$pidfile" 2>/dev/null) last_heartbeat=$(date -u -d "@$last" +%FT%TZ) down_at_most=${down}s (~$(( down / 60 ))min)"
+    line="$(date -u +%FT%TZ) ${DAEMON_NAME} UNCLEAN_EXIT owner=$(_dl_owner) last_heartbeat=$(date -u -d "@$last" +%FT%TZ) down_at_most=${down}s (~$(( down / 60 ))min)"
   else
-    line="$(date -u +%FT%TZ) ${DAEMON_NAME} UNCLEAN_EXIT pid=$(cat "$pidfile" 2>/dev/null) last_heartbeat=unknown"
+    line="$(date -u +%FT%TZ) ${DAEMON_NAME} UNCLEAN_EXIT owner=$(_dl_owner) last_heartbeat=unknown"
   fi
   echo "$line" >> "$OUTAGE_LOG"
   echo "[$(date -u +%FT%TZ)] OUTAGE detected on relaunch: $line" >> "$(_dl_log)"
@@ -73,10 +111,11 @@ _dl_record_outage() {
 }
 
 _dl_loop() {
-  local pidfile; pidfile="$(_dl_pidfile)"
-  echo "$$" > "$pidfile"
-  trap 'echo "[$(date -u +%FT%TZ)] daemon stopping (signal)"; rm -f "'"$pidfile"'"; exit 0' TERM INT
-  echo "[$(date -u +%FT%TZ)] daemon started pid=$$ ppid=$PPID name=${DAEMON_NAME}"
+  local pidfile me; pidfile="$(_dl_pidfile)"; me="$(_dl_ns):$$"
+  echo "$me" > "$pidfile"
+  # only remove the pidfile if it still names this loop (never a successor's)
+  trap 'echo "[$(date -u +%FT%TZ)] daemon stopping (signal)"; [ "$(_dl_owner)" = "'"$me"'" ] && rm -f "'"$pidfile"'"; exit 0' TERM INT
+  echo "[$(date -u +%FT%TZ)] daemon started pid=$$ ppid=$PPID owner=$me name=${DAEMON_NAME}"
   _dl_beat
   # First tick runs immediately so any downtime gap is backfilled on start.
   while true; do
@@ -95,6 +134,10 @@ _dl_loop() {
       sleep "$chunk" &
       wait $! || true
       left=$(( left - chunk ))
+      if [ "$(_dl_owner)" != "$me" ]; then
+        echo "[$(date -u +%FT%TZ)] superseded (pidfile now '$(_dl_owner)'); this loop ($me) exits"
+        exit 0
+      fi
       _dl_beat
     done
   done
@@ -109,7 +152,7 @@ daemon_main() {
       ;;
     start|ensure)
       if _dl_is_alive; then
-        echo "${DAEMON_NAME} daemon already running (pid=$(cat "$pidfile")) — nothing to do (idempotent)"
+        echo "${DAEMON_NAME} daemon already running (owner=$(_dl_owner), heartbeat $(_dl_hb_age)s ago) — nothing to do (idempotent)"
         return 0
       fi
       _dl_record_outage
@@ -117,7 +160,7 @@ daemon_main() {
       disown 2>/dev/null || true
       sleep 1
       if _dl_is_alive; then
-        echo "${DAEMON_NAME} daemon launched (pid=$(cat "$pidfile")); log=$log"
+        echo "${DAEMON_NAME} daemon launched (owner=$(_dl_owner)); log=$log"
       else
         echo "ERROR: ${DAEMON_NAME} daemon failed to start; see $log" >&2
         tail -n 20 "$log" 2>/dev/null || true
@@ -125,13 +168,19 @@ daemon_main() {
       fi
       ;;
     stop)
-      if _dl_is_alive; then
-        local pid; pid="$(cat "$pidfile")"
+      if _dl_local_alive; then
+        local pid; pid="$(_dl_local_pid)"
         kill "$pid" 2>/dev/null || true
         sleep 1
         kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
         rm -f "$pidfile"
         echo "${DAEMON_NAME} daemon stopped (was pid=$pid)"
+      elif _dl_is_alive; then
+        # owned by another namespace: we cannot signal it, but removing the
+        # pidfile makes it retire itself at its next heartbeat check
+        echo "${DAEMON_NAME} daemon is owned by $(_dl_owner) (another namespace);" \
+             "pidfile removed — it exits within ${HEARTBEAT_SECS}s"
+        rm -f "$pidfile"
       else
         echo "${DAEMON_NAME} daemon not running"
         rm -f "$pidfile"
@@ -143,9 +192,8 @@ daemon_main() {
       ;;
     status)
       if _dl_is_alive; then
-        local pid; pid="$(cat "$pidfile")"
-        local hb; hb="$(cat "$(_dl_hbfile)" 2>/dev/null || echo "")"
-        echo "STATUS: RUNNING  pid=$pid  uptime=$(ps -o etime= -p "$pid" 2>/dev/null | tr -d ' ')  heartbeat_age=$([ -n "$hb" ] && echo "$(( $(date -u +%s) - hb ))s" || echo n/a)"
+        local pid; pid="$(_dl_local_pid)"
+        echo "STATUS: RUNNING  owner=$(_dl_owner)$(_dl_local_alive && echo "  uptime=$(ps -o etime= -p "$pid" | tr -d ' ')" || echo "  (other namespace)")  heartbeat_age=$(_dl_hb_age)s"
       else
         echo "STATUS: NOT running"
       fi

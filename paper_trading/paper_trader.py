@@ -36,11 +36,13 @@ from datetime import datetime, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
+sys.path.insert(0, HERE)
 import config                                   # noqa: E402
 import bear_strategy as bs                      # noqa: E402
 from regime import compute_regimes, sma, drawdown_from_high  # noqa: E402
 import live_engine as le                        # noqa: E402  (reuse fetch + staleness)
 from upbit_client import UpbitClient            # noqa: E402
+import tick_lock                                # noqa: E402  (serialises concurrent daemon ticks)
 
 JSONL_PATH = os.path.join(HERE, "paper_log.jsonl")
 JOURNAL_PATH = os.path.join(HERE, "JOURNAL.md")
@@ -308,7 +310,8 @@ def main():
     ap.add_argument("--mode", choices=list(bs.MODES), default="long_flat",
                     help="strategy target (default: long_flat — the live-engine default)")
     args = ap.parse_args()
-    process(args.mode)
+    with tick_lock.exclusive("paper_trader"):   # serialise concurrent daemons
+        process(args.mode)
 
 
 if __name__ == "__main__":
