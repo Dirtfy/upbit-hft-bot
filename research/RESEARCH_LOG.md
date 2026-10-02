@@ -1235,3 +1235,38 @@ itself when the pidfile no longer names it. `stop` works across namespaces.
 `collect_4h.py`/`paper_trader.py` also take an fcntl tick lock
 (`paper_trading/tick_lock.py`) so concurrent ticks cannot double-append.
 Tests: daemons 17/17, engine_execute 18/18. Full suite **105/105**. best_config → last_cycle=27.
+
+## Cycle 28 — 2026-10-02 · regime hysteresis-band sweep (negative result) + shadow stress fix
+
+Daily standing cycle. Research/backtest only; config unchanged.
+
+**Question (from Cycle 27):** the live long_flat filter whipsaws around SMA200 (6
+of 10 trades since 2023 were small losses). Would a hysteresis band help?
+`backtest/band_sweep.py` swept BEAR.band ∈ {0,1,2,3,5,8}% on daily KRW-BTC
+2017-09 → 2026-09, with fills at next open and 0.05%/side fees.
+
+| band | CAGR | maxDD | Sharpe | trades | small losses | years beat / lose vs 0 |
+|---|---|---|---|---|---|---|
+| 0% (live) | 22.4% | 46.7% | 0.86 | 15 | 6 | – |
+| 1% | 21.8% | 46.6% | 0.84 | 13 | 3 | 1 / 1 |
+| 2% | 22.0% | 46.1% | 0.85 | 12 | 2 | 1 / 2 |
+| 3% | 22.0% | 46.1% | 0.85 | 11 | 2 | 1 / 2 |
+| 5% | 21.0% | 46.1% | 0.82 | 11 | 2 | 1 / 2 |
+| 8% | 22.4% | 46.1% | 0.86 | 10 | 1 | 1 / 2 |
+
+Bear windows (2018, 2021-22) are identical for every band; the 20%/10% drawdown
+breaker does the defending, not the SMA cross. A band removes whipsaw trades, but
+it enters later and exits later by the same amount, so CAGR and Sharpe do not
+improve (2023 better, 2024/2025 worse). **Decision: keep band=0.** No robust gain,
+and adding a parameter that does nothing is overfitting risk. Guarded by
+tests/test_band_sweep.py (3/3).
+
+**Shadow stress fix:** the stress scenario stopped tripping the kill switch once
+the 4h trail grew. It grouped "same day" by candle open date, but the risk day
+follows the decision time (candle + 4h). It is now anchored on a 00:00 candle,
+and verified to fire all four risk paths for all 177 possible window ends. Test
+bug only; the engine was correct.
+
+Official paper: cycle 8 (candle 2026-10-01): bear, HOLD, FLAT, 1,000,000 KRW,
++0.00%. Daemons alive (owned by the other container; fresh heartbeat), with no
+new outages since the Cycle 27 fix. Full suite **108/108**. best_config → last_cycle=28.

@@ -149,8 +149,10 @@ def scenario_stress(bars):
     sh.step(bar(1), 0, at(1), "exit (real price)")
     # 2) two losing round trips inside one UTC day -> daily-loss kill switch
     #    (DAILY_LOSS_LIMIT 50,000 KRW on 200,000 KRW trades needs ~-25% total).
-    day = [k for k in range(2, 30) if seq[k]["t"][:10] == seq[2]["t"][:10]]
-    k0, k1, k2, k3 = (day + list(range(day[-1] + 1, 30)))[:4]
+    #    The risk day follows the DECISION time (candle open + 4h), so start on a
+    #    00:00 candle: its four decisions land 04:01..16:01 of one UTC day.
+    k0 = next(k for k in range(2, 30) if seq[k]["t"][11:13] == "00")
+    k1, k2, k3 = k0 + 1, k0 + 2, k0 + 3
     sh.step(bar(k0), 1, at(k0), "enter")
     sh.step(bar(k1, -0.15), 0, at(k1), "exit into SYNTHETIC -15% shock")
     sh.step(bar(k2), 1, at(k2), "re-enter same day (loss still under limit)")

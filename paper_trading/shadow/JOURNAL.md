@@ -35,19 +35,19 @@
 
 | 결정 시각(UTC) | 봉 | 목표 | 행동 | 체결가 | 금액 | 손익 | 일손실 누계 | HALT | 리스크 경로 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 2026-09-26T16:01 | 2026-09-26T12:00 | LONG | BUY | 114,042,104 | 200,000 | — | +0 |  |  | enter |
-| 2026-09-26T20:01 | 2026-09-26T16:00 | FLAT | SELL | 114,036,892 | 200,000 | -209 | -209 |  |  | exit (real price) |
-| 2026-09-27T00:01 | 2026-09-26T20:00 | LONG | BUY | 114,872,228 | 200,000 | — | +0 |  |  | enter |
-| 2026-09-27T04:01 | 2026-09-27T00:00 | FLAT | SELL | 97,735,338 | 200,000 | -30,007 | -30,007 |  |  | exit into SYNTHETIC -15% shock |
-| 2026-09-27T08:01 | 2026-09-27T04:00 | LONG | BUY | 115,072,258 | 200,000 | — | -30,007 |  |  | re-enter same day (loss still under limit) |
-| 2026-09-27T12:01 | 2026-09-27T08:00 | FLAT | SELL | 98,018,345 | 200,000 | -29,811 | -59,817 | Y | kill_switch_tripped | exit into SYNTHETIC -15% shock -> kill switch |
-| 2026-09-27T16:01 | 2026-09-27T12:00 | LONG | HOLD | 0 | 0 | — | -59,817 | Y | halt_blocked_entry | bull signal while HALTed |
-| 2026-09-29T16:01 | 2026-09-28T12:00 | LONG | HOLD | 0 | 0 | — | -59,817 | Y | halt_blocked_entry | next day, still HALTed |
-| 2026-09-29T20:01 | 2026-09-28T16:00 | LONG | BUY | 113,451,015 | 200,000 | — | +0 |  |  | after operator HALT clear |
-| 2026-09-30T00:01 | 2026-09-28T20:00 | FLAT | SELL | 113,479,975 | 200,000 | -149 | -149 | Y | exit_allowed_under_halt | bear while HALTed -> exit must still go through |
-| 2026-09-30T04:01 | 2026-09-29T00:00 | LONG | BUY | 112,721,906 | 200,000 | — | +0 |  |  | fresh entry |
-| 2026-09-30T08:01 | 2026-09-29T04:00 | FLAT | SELL | 113,869,917 | 200,000 | +1,835 | +1,835 |  |  | exit |
-| 2026-10-03T00:01 | 2026-09-29T08:00 | LONG | HOLD | 0 | 0 | — | +1,835 |  | stale_blocked_entry | stale feed (60h old) |
+| 2026-09-27T12:01 | 2026-09-27T08:00 | LONG | BUY | 115,350,300 | 200,000 | — | +0 |  |  | enter |
+| 2026-09-27T16:01 | 2026-09-27T12:00 | FLAT | SELL | 114,803,777 | 200,000 | -1,147 | -1,147 |  |  | exit (real price) |
+| 2026-09-28T04:01 | 2026-09-28T00:00 | LONG | BUY | 113,019,950 | 200,000 | — | +0 |  |  | enter |
+| 2026-09-28T08:01 | 2026-09-28T04:00 | FLAT | SELL | 95,877,516 | 200,000 | -30,505 | -30,505 |  |  | exit into SYNTHETIC -15% shock |
+| 2026-09-28T12:01 | 2026-09-28T08:00 | LONG | BUY | 112,838,923 | 200,000 | — | -30,505 |  |  | re-enter same day (loss still under limit) |
+| 2026-09-28T16:01 | 2026-09-28T12:00 | FLAT | SELL | 96,290,554 | 200,000 | -29,502 | -60,006 | Y | kill_switch_tripped | exit into SYNTHETIC -15% shock -> kill switch |
+| 2026-09-28T20:01 | 2026-09-28T16:00 | LONG | HOLD | 0 | 0 | — | -60,006 | Y | halt_blocked_entry | bull signal while HALTed |
+| 2026-09-30T20:01 | 2026-09-29T16:00 | LONG | HOLD | 0 | 0 | — | -60,006 | Y | halt_blocked_entry | next day, still HALTed |
+| 2026-10-01T00:01 | 2026-09-29T20:00 | LONG | BUY | 113,604,038 | 200,000 | — | +0 |  |  | after operator HALT clear |
+| 2026-10-01T04:01 | 2026-09-30T00:00 | FLAT | SELL | 113,117,030 | 200,000 | -1,056 | -1,056 | Y | exit_allowed_under_halt | bear while HALTed -> exit must still go through |
+| 2026-10-01T08:01 | 2026-09-30T04:00 | LONG | BUY | 113,016,950 | 200,000 | — | -1,056 |  |  | fresh entry |
+| 2026-10-01T12:01 | 2026-09-30T08:00 | FLAT | SELL | 113,525,969 | 200,000 | +700 | -357 |  |  | exit |
+| 2026-10-04T04:01 | 2026-09-30T12:00 | LONG | HOLD | 0 | 0 | — | -357 |  | stale_blocked_entry | stale feed (60h old) |
 
 ## historical
 
