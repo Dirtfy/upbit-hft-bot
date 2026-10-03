@@ -33,7 +33,17 @@ PAPER_MODE="${PAPER_MODE:-long_flat}"
 source "$(dirname "$SELF")/daemon_lib.sh"
 
 daemon_tick() {
+  local rc
   "$PY" paper_trading/paper_trader.py --mode "$PAPER_MODE"
+  rc=$?
+  # SHADOW book (owner option B, 2026-10-04): candidate dd 12.5%/5%, own ledger in
+  # paper_trading/shadow_exit_book/. Runs AFTER the official tick and can never
+  # change its result: a shadow failure is logged and ignored.
+  if [ "$PAPER_MODE" = long_flat ]; then
+    "$PY" paper_trading/shadow_exit_book/shadow_book.py \
+      || echo "shadow_exit_book tick FAILED (official book unaffected)"
+  fi
+  return $rc
 }
 
 daemon_next_sleep() {
@@ -60,6 +70,8 @@ print(f"cycles={len(recs)} last_candle={r['candle_t']} mode={r['mode']} "
       f"regime={r['regime']} action={r['action']} pos={r['position_after']} "
       f"equity={r['equity_krw']:,.0f} KRW cum={r['cum_return_pct']:.2f}%")
 PYEOF
+  echo "--- shadow book (dd 12.5%/5%) vs official ---"
+  "$PY" paper_trading/shadow_exit_book/compare.py 2>&1 | tail -1
 }
 
 daemon_main "$@"

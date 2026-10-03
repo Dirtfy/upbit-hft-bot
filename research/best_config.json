@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-03",
-  "last_cycle": 29,
+  "updated": "2026-10-04",
+  "last_cycle": 30,
   "tradable_capital_cap": {
     "added_cycle": 15,
     "param": "config.BASE_TRADABLE_CAPITAL_KRW",
@@ -180,7 +180,7 @@
   },
   "exit_sweep_proposal": {
     "added_cycle": 29,
-    "status": "PROPOSAL pending owner approval; config.BEAR unchanged (dd_enter=0.20, dd_exit=0.10)",
+    "status": "OWNER OPTION B (2026-10-04): running as forward SHADOW book paper_trading/shadow_exit_book/ until ~2026-10-24; official config.BEAR unchanged (0.20/0.10)",
     "candidate": {
       "dd_enter": 0.125,
       "dd_exit": 0.05

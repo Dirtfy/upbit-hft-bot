@@ -105,6 +105,14 @@ paper_trading/daemon_4h.sh logs      # 데몬 로그 tail
 (구식 `run_4h_collector.sh` + `7 */4 * * *`는 단발 실행용 래퍼로 남겨둠 — 데몬이
 상위 호환.) 상세는 `report.txt`.
 
+### SHADOW 북 — 후보 청산속도 12.5% / 5% (오너 option B, 2026-10-04)
+`shadow_exit_book/`은 공식 원장과 **분리된** 두 번째 모의 원장이다. 공식(20%/10%)과
+데이터·수수료·체결·사이징·1M 상한이 같고 dd_enter/dd_exit만 다르다. 공식
+`paper_trader.py`를 수정하지 않고 그대로 호출하되, 출력 경로만 이 폴더로 돌린다.
+`daemon_paper.sh`의 같은 틱에서 공식 다음에 실행된다(토큰 0, 호스트 cron이 유지).
+비교표는 `shadow_exit_book/COMPARE.md`, 요약 한 줄은 `daemon_paper.sh status`.
+(`shadow/`의 반사실 리플레이와는 별개다.)
+
 ### 4h 모의투자 트랙(선택) — 일봉 원장과 분리
 현재 방어 전략의 장세필터는 **일봉 기준(SMA200 등)**이라 4h봉에 그대로 적용하면
 의미가 달라진다. 그래서 이번 단계는 **4h 데이터 축적까지만** 수행한다. 4h 기반

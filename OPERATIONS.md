@@ -131,6 +131,22 @@ a synthetic stress walk, and a historical replay. It uses throwaway temp state a
 writes only `paper_trading/shadow/` (every record `counterfactual: true`). It never
 touches the official paper ledger. It is a one-off research tool, not a daemon.
 
+**Forward SHADOW book — exit speed 12.5% / 5% (owner option B, 2026-10-04).**
+`paper_trading/shadow_exit_book/` is a second paper ledger. It runs forward
+next to the official one so the final 20/10-vs-12.5/5 choice (around
+2026-10-24) rests on real forward data. `shadow_book.py` calls the unchanged
+`paper_trader.process()` with all output paths redirected to that directory and
+config.BEAR overridden to dd_enter=0.125, dd_exit=0.05, both restored on
+exit. Data, fees, fills, sizing and the 1M cap are the same. Every record
+carries `book: shadow_exit_12.5_5, official: false`. The first run backfilled
+from the official first candle (`backfilled_at_launch: true`).
+`compare.py` writes `COMPARE.md`: side-by-side equity, return, position,
+divergences, and a check that both books saw identical close prices.
+It runs inside the paper daemon's tick, after the official tick, so the host
+cron keeps it alive with no extra keep-alive, and a shadow failure cannot
+change the official result. `daemon_paper.sh status` prints the comparison
+headline. Tests: `tests/test_shadow_exit_book.py`.
+
 ## Autonomous-process operating model (owner directive 2026-09-27)
 
 **Principle: every "code" artifact — data collection AND the trading loop — runs

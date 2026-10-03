@@ -1313,3 +1313,18 @@ Guarded by tests/test_exit_sweep.py (4/4).
 Official paper: cycle 9 (candle 2026-10-02): bear, HOLD, FLAT, 1,000,000 KRW,
 +0.00%. Daemons alive (other container, fresh heartbeat), no new outages.
 4h trail 222 rows, no gaps. Full suite **112/112**. best_config → last_cycle=29.
+
+## Cycle 30 (2026-10-04): owner option B. Forward SHADOW book for dd 12.5%/5%
+
+The owner chose to run the Cycle 29 candidate as a separate shadow paper ledger
+until the official period ends (~2026-10-24). The official book stays at 20/10,
+and paper_trader.py is not modified.
+
+`paper_trading/shadow_exit_book/` holds the shadow book. `shadow_book.py` reuses
+the official `process()` with its paths redirected and dd overridden.
+`compare.py` writes COMPARE.md. The book is hooked into the paper daemon's tick,
+so the host cron covers it. It was backfilled from the official first candle
+(2026-09-24): 9 cycles, identical closes, 0 divergences, both FLAT at
+1,000,000 KRW (BTC is about 35% below its 1-year high, so both settings say
+bear). The official files were verified byte-identical (sha1) across the launch.
+tests/test_shadow_exit_book.py passes 12/12.
