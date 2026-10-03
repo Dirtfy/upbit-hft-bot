@@ -1,6 +1,6 @@
 {
-  "updated": "2026-09-27",
-  "last_cycle": 28,
+  "updated": "2026-10-03",
+  "last_cycle": 29,
   "tradable_capital_cap": {
     "added_cycle": 15,
     "param": "config.BASE_TRADABLE_CAPITAL_KRW",
@@ -177,5 +177,19 @@
     "visibility": "public",
     "published_cycle": 19,
     "note": "Korean README/report; scaffolding+secrets excluded; diagram docs/architecture.png"
+  },
+  "exit_sweep_proposal": {
+    "added_cycle": 29,
+    "status": "PROPOSAL pending owner approval; config.BEAR unchanged (dd_enter=0.20, dd_exit=0.10)",
+    "candidate": {
+      "dd_enter": 0.125,
+      "dd_exit": 0.05
+    },
+    "full_sample": "CAGR 22.4->28.9%, maxDD 46.7->28.5%, Sharpe 0.86->1.16",
+    "walk_forward": "pick on 2017-21 (12.5/7.5) -> OOS 2022+ +132%/22.1%DD vs live +98%/40.1%",
+    "plateau": "dd_enter 11-16% x dd_exit 4-6%",
+    "cost": "2020 +107% vs +148%",
+    "script": "backtest/exit_sweep.py",
+    "test": "tests/test_exit_sweep.py 4/4"
   }
 }

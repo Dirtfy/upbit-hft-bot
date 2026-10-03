@@ -1270,3 +1270,46 @@ bug only; the engine was correct.
 Official paper: cycle 8 (candle 2026-10-01): bear, HOLD, FLAT, 1,000,000 KRW,
 +0.00%. Daemons alive (owned by the other container; fresh heartbeat), with no
 new outages since the Cycle 27 fix. Full suite **108/108**. best_config → last_cycle=28.
+
+## Cycle 29 (2026-10-03): faster-exit sweep (dd_enter / dd_exit). PROPOSAL, config unchanged
+
+**Question (from Cycle 28):** can a faster exit cut the 46.7% maxDD? That
+drawdown runs from the 2021-04-13 equity peak to 2023-10-17. It is made of
+profit handed back before the 2021-04-23 exit, a -18% trade in Oct–Dec 2021,
+and the 2023 whipsaws. The exit-speed lever is the drawdown breaker:
+dd_enter (a trailing stop off the 365-bar high) and dd_exit (how far price
+must recover before bull is allowed again). `backtest/exit_sweep.py` sweeps
+both on daily KRW-BTC 2017-09 → 2026-09 (next-open fills, fees, no lookahead).
+A change counts as "robust" only if it is no worse on return AND maxDD in both
+halves (split at 2022-01-01), and no worse in either bear window.
+
+| dd_enter / dd_exit | CAGR | maxDD | Sharpe | trades | H1 ret / dd | H2 ret / dd | 2021-22 bear |
+|---|---|---|---|---|---|---|---|
+| 20% / 10% (live) | 22.4% | 46.7% | 0.86 | 15 | +211% / 39.1% | +98% / 40.1% | -22.0% |
+| 12.5% / 5% | 28.9% | 28.5% | 1.16 | 11 | +316% / 24.3% | +137% / 23.1% | -11.4% |
+| 15% / 5% | 28.3% | 32.7% | 1.12 | 10 | +264% / 29.6% | +159% / 23.1% | -14.0% |
+| 10% / 5% | 21.9% | 34.8% | 0.96 | 19 | too tight: whipsaw |
+
+Robustness checks:
+- **A plateau, not a spike.** A finer grid (dd_enter 10–20% in 1% steps × dd_exit
+  4–10%) shows a broad region at dd_enter 11–16% with dd_exit 4–6%: CAGR ~24–30%,
+  maxDD ~28–35%. Beyond about 17% it falls back to the live numbers.
+- **Start-date jitter.** Starting every 90 days from 2017-09 to 2020-09, 12.5%/5%
+  beats live on both CAGR and maxDD from 13 of 13 starts.
+- **Walk-forward.** Picking by Sharpe on 2017–2021 only gives 12.5% / 7.5%. Out of
+  sample (2022+), that pick returns +132% with 22.1% maxDD, vs live +98% / 40.1%.
+- **Cost.** Strong bull years give some back: 2020 is +107% vs +148% live,
+  because a tighter trailing stop is shaken out by bull-market corrections.
+  2021 swings from -7.4% to +39.2%. 2024 is +86% vs +60%.
+
+**Decision: PROPOSAL only. config.BEAR is unchanged.** The official 30-day
+paper run must not change rules mid-period without owner approval. Both
+configs read "bear" today, so nothing would differ right now. Caveats: this is
+one asset, one 9-year history, and only ~10 trades. Recommended adoption path,
+if the owner approves: dd_enter=0.125, dd_exit=0.05, switched at the end of
+the paper period (or as a labelled shadow book alongside it).
+Guarded by tests/test_exit_sweep.py (4/4).
+
+Official paper: cycle 9 (candle 2026-10-02): bear, HOLD, FLAT, 1,000,000 KRW,
++0.00%. Daemons alive (other container, fresh heartbeat), no new outages.
+4h trail 222 rows, no gaps. Full suite **112/112**. best_config → last_cycle=29.
