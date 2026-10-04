@@ -171,6 +171,14 @@ paper_trading/daemon_paper.sh {start|ensure|status|stop|restart|logs}  # daily p
 - **4h collector** — loops `collect_4h.py` every 4h; appends closed candles to the
   committed trail `paper_trading/market_data_4h.csv`. Gap-free idempotent backfill.
   Log `logs/collect_4h_daemon.log`, PID `logs/collect_4h_daemon.pid`.
+- **4h tick extras (Cycle 31, token-free, failures never affect the collector):**
+  after `collect_4h.py`, the tick runs `paper_trading/ensemble_books/ensemble_book.py`.
+  That script refreshes public 1h candles into `data/1h/` and advances the
+  official=false ensemble shadow books, writing `ensemble_books/COMPARE.md` and
+  `<book>/SUMMARY.md`. The tick then runs `research/evolution/run_evolution.sh maybe`,
+  which starts a detached GA run only when `results/latest.json` is older than 7 days.
+  It logs to `logs/evolution.log`, holds a lock at `logs/evolution.lock`, and
+  `run_evolution.sh status` reports on it.
 - **Paper trader** — runs `paper_trader.py` once per closed daily candle (00:05 UTC);
   appends one record to `paper_log.jsonl` / `JOURNAL.md` / `market_data_daily.csv`
   and regenerates `SUMMARY.md`. The decision is deterministic strategy code

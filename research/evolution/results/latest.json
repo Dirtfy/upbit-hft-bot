@@ -1,0 +1,987 @@
+{
+ "generated_utc": "2026-10-04T03:36:32Z",
+ "data_end_utc": "2026-10-04T03:00Z",
+ "config": {
+  "pop": 40,
+  "gens": 20,
+  "seed": 31,
+  "train_start": "2018-01-01T00:00:00",
+  "holdout_start": "2025-01-01T00:00:00",
+  "wf_test_years": [
+   2021,
+   2022,
+   2023,
+   2024
+  ],
+  "delays_h": [
+   0,
+   5
+  ],
+  "cost_per_side": 0.001,
+  "universe": [
+   "KRW-BTC",
+   "KRW-ETH",
+   "KRW-XRP",
+   "KRW-SOL",
+   "KRW-DOGE",
+   "KRW-ADA"
+  ]
+ },
+ "n_trials": 3463,
+ "is_sharpe_var": 0.1405,
+ "wfo": {
+  "folds": [
+   {
+    "year": 2021,
+    "fitness": 1.8989749283929738,
+    "desc": "hold[]xbull 1.0/side 0.0 + tsmom[tf=1d,days=60]xbull 0.5/side 0.0 + donchian[tf=4h,n_in=10,n_out=5,atr_k=3]xbull 1.0/side 0.25 + volbreak[k=0.5,ma_days=5]xbull 1.0/side 1.0 + meanrev[tf=1d,rsi_n=3,lo=10,hi=70,trend=0]xbull 0.25/side 0.0 + rotation[days=14,top_k=1,every=1]xbull 0.0/side 1.0 + pairs[n=20,z0=2.0]xbull 0.25/side 0.0 | gate=none vt=0.6 band=0.2 switch=1",
+    "is": {
+     "d0": {
+      "days": 1097,
+      "trades": 531,
+      "total": 9.1128,
+      "cagr": 1.161,
+      "mdd": 0.2195,
+      "sharpe": 2.2925,
+      "turnover": 58.2811,
+      "exposure": 0.3277
+     },
+     "d5": {
+      "days": 1097,
+      "trades": 531,
+      "total": 8.1841,
+      "cagr": 1.0928,
+      "mdd": 0.2613,
+      "sharpe": 2.2007,
+      "turnover": 58.2494,
+      "exposure": 0.3868
+     }
+    },
+    "oos": {
+     "d0": {
+      "days": 366,
+      "trades": 181,
+      "total": 0.4396,
+      "cagr": 0.4396,
+      "mdd": 0.3809,
+      "sharpe": 1.2293,
+      "turnover": 55.7154,
+      "exposure": 0.3677
+     },
+     "d5": {
+      "days": 366,
+      "trades": 183,
+      "total": 0.2488,
+      "cagr": 0.2488,
+      "mdd": 0.417,
+      "sharpe": 0.7969,
+      "turnover": 56.4962,
+      "exposure": 0.4206
+     }
+    },
+    "baselines_oos_d5": {
+     "buy_and_hold": {
+      "days": 366,
+      "trades": 1,
+      "total": 0.7729,
+      "cagr": 0.7729,
+      "mdd": 0.5629,
+      "sharpe": 1.1609,
+      "turnover": 1.0,
+      "exposure": 1.0
+     },
+     "official_dd20_10": {
+      "days": 366,
+      "trades": 8,
+      "total": -0.1361,
+      "cagr": -0.1361,
+      "mdd": 0.4272,
+      "sharpe": -0.1032,
+      "turnover": 8.0042,
+      "exposure": 0.3743
+     },
+     "shadow_dd12.5_5": {
+      "days": 366,
+      "trades": 8,
+      "total": 0.4199,
+      "cagr": 0.4199,
+      "mdd": 0.236,
+      "sharpe": 1.1381,
+      "turnover": 8.0037,
+      "exposure": 0.2705
+     },
+     "donchian20_20_atr3": {
+      "days": 366,
+      "trades": 10,
+      "total": 0.9295,
+      "cagr": 0.9295,
+      "mdd": 0.2691,
+      "sharpe": 1.552,
+      "turnover": 10.0044,
+      "exposure": 0.5109
+     }
+    }
+   },
+   {
+    "year": 2022,
+    "fitness": 2.2351741533217804,
+    "desc": "donchian[tf=4h,n_in=10,n_out=5,atr_k=3]x1.0 + volbreak[k=0.6,ma_days=20]x0.25 + rotation[days=14,top_k=1,every=1]x0.5 | gate=none vt=0.4 band=0.1 switch=0",
+    "is": {
+     "d0": {
+      "days": 1462,
+      "trades": 808,
+      "total": 17.5534,
+      "cagr": 1.0744,
+      "mdd": 0.242,
+      "sharpe": 2.4239,
+      "turnover": 39.604,
+      "exposure": 0.2593
+     },
+     "d5": {
+      "days": 1462,
+      "trades": 815,
+      "total": 15.3604,
+      "cagr": 1.0102,
+      "mdd": 0.2182,
+      "sharpe": 2.3744,
+      "turnover": 39.6771,
+      "exposure": 0.2748
+     }
+    },
+    "oos": {
+     "d0": {
+      "days": 366,
+      "trades": 201,
+      "total": -0.1513,
+      "cagr": -0.1513,
+      "mdd": 0.2128,
+      "sharpe": -0.4866,
+      "turnover": 43.7893,
+      "exposure": 0.2109
+     },
+     "d5": {
+      "days": 366,
+      "trades": 200,
+      "total": -0.1975,
+      "cagr": -0.1975,
+      "mdd": 0.2458,
+      "sharpe": -0.6689,
+      "turnover": 43.8148,
+      "exposure": 0.2276
+     }
+    },
+    "baselines_oos_d5": {
+     "buy_and_hold": {
+      "days": 366,
+      "trades": 1,
+      "total": -0.6294,
+      "cagr": -0.6294,
+      "mdd": 0.637,
+      "sharpe": -1.5785,
+      "turnover": 1.0,
+      "exposure": 1.0
+     },
+     "official_dd20_10": {
+      "days": 366,
+      "trades": 0,
+      "total": 0.0,
+      "cagr": 0.0,
+      "mdd": 0.0,
+      "sharpe": 0.0,
+      "turnover": 0.0,
+      "exposure": 0.0
+     },
+     "shadow_dd12.5_5": {
+      "days": 366,
+      "trades": 0,
+      "total": 0.0,
+      "cagr": 0.0,
+      "mdd": 0.0,
+      "sharpe": 0.0,
+      "turnover": 0.0,
+      "exposure": 0.0
+     },
+     "donchian20_20_atr3": {
+      "days": 366,
+      "trades": 10,
+      "total": -0.333,
+      "cagr": -0.333,
+      "mdd": 0.333,
+      "sharpe": -1.5273,
+      "turnover": 10.0054,
+      "exposure": 0.2268
+     }
+    }
+   },
+   {
+    "year": 2023,
+    "fitness": 1.3285142062501258,
+    "desc": "volbreak[k=0.7,ma_days=3]x1.0 + pairs[n=20,z0=2.0]x0.75 | gate=dd12.5_5 vt=0.8 band=0.0 switch=0",
+    "is": {
+     "d0": {
+      "days": 1827,
+      "trades": 181,
+      "total": 1.4784,
+      "cagr": 0.1989,
+      "mdd": 0.0977,
+      "sharpe": 1.4918,
+      "turnover": 13.6512,
+      "exposure": 0.0364
+     },
+     "d5": {
+      "days": 1827,
+      "trades": 181,
+      "total": 1.9935,
+      "cagr": 0.245,
+      "mdd": 0.0955,
+      "sharpe": 1.6235,
+      "turnover": 13.6518,
+      "exposure": 0.0511
+     }
+    },
+    "oos": {
+     "d0": {
+      "days": 366,
+      "trades": 68,
+      "total": 0.1787,
+      "cagr": 0.1787,
+      "mdd": 0.0394,
+      "sharpe": 1.7222,
+      "turnover": 27.2573,
+      "exposure": 0.0691
+     },
+     "d5": {
+      "days": 366,
+      "trades": 68,
+      "total": 0.1128,
+      "cagr": 0.1128,
+      "mdd": 0.0636,
+      "sharpe": 1.1241,
+      "turnover": 27.2368,
+      "exposure": 0.0956
+     }
+    },
+    "baselines_oos_d5": {
+     "buy_and_hold": {
+      "days": 366,
+      "trades": 1,
+      "total": 1.7081,
+      "cagr": 1.7081,
+      "mdd": 0.175,
+      "sharpe": 2.803,
+      "turnover": 1.0,
+      "exposure": 1.0
+     },
+     "official_dd20_10": {
+      "days": 366,
+      "trades": 11,
+      "total": 0.2993,
+      "cagr": 0.2993,
+      "mdd": 0.2155,
+      "sharpe": 1.1363,
+      "turnover": 11.0051,
+      "exposure": 0.5109
+     },
+     "shadow_dd12.5_5": {
+      "days": 366,
+      "trades": 3,
+      "total": 0.2812,
+      "cagr": 0.2812,
+      "mdd": 0.1322,
+      "sharpe": 1.2577,
+      "turnover": 3.0011,
+      "exposure": 0.3552
+     },
+     "donchian20_20_atr3": {
+      "days": 366,
+      "trades": 9,
+      "total": 0.8981,
+      "cagr": 0.8981,
+      "mdd": 0.2183,
+      "sharpe": 2.2077,
+      "turnover": 9.0038,
+      "exposure": 0.5929
+     }
+    }
+   },
+   {
+    "year": 2024,
+    "fitness": 1.6681239805994648,
+    "desc": "donchian[tf=4h,n_in=10,n_out=5,atr_k=2]x1.0 + rotation[days=60,top_k=1,every=1]x0.25 + pairs[n=60,z0=1.0]x0.5 | gate=dd12.5_5 vt=0.6 band=0.0 switch=0",
+    "is": {
+     "d0": {
+      "days": 2192,
+      "trades": 376,
+      "total": 4.5391,
+      "cagr": 0.33,
+      "mdd": 0.139,
+      "sharpe": 1.7541,
+      "turnover": 8.6602,
+      "exposure": 0.0871
+     },
+     "d5": {
+      "days": 2192,
+      "trades": 376,
+      "total": 4.3108,
+      "cagr": 0.3207,
+      "mdd": 0.1194,
+      "sharpe": 1.6949,
+      "turnover": 8.6553,
+      "exposure": 0.0854
+     }
+    },
+    "oos": {
+     "d0": {
+      "days": 367,
+      "trades": 194,
+      "total": 0.5907,
+      "cagr": 0.5887,
+      "mdd": 0.1457,
+      "sharpe": 1.8572,
+      "turnover": 21.9752,
+      "exposure": 0.2099
+     },
+     "d5": {
+      "days": 367,
+      "trades": 194,
+      "total": 0.6004,
+      "cagr": 0.5983,
+      "mdd": 0.1492,
+      "sharpe": 1.8674,
+      "turnover": 21.9825,
+      "exposure": 0.2061
+     }
+    },
+    "baselines_oos_d5": {
+     "buy_and_hold": {
+      "days": 367,
+      "trades": 1,
+      "total": 1.4425,
+      "cagr": 1.4366,
+      "mdd": 0.2929,
+      "sharpe": 2.1422,
+      "turnover": 0.9973,
+      "exposure": 1.0
+     },
+     "official_dd20_10": {
+      "days": 367,
+      "trades": 7,
+      "total": 0.575,
+      "cagr": 0.5731,
+      "mdd": 0.4294,
+      "sharpe": 1.3459,
+      "turnover": 6.9839,
+      "exposure": 0.6948
+     },
+     "shadow_dd12.5_5": {
+      "days": 367,
+      "trades": 5,
+      "total": 0.9126,
+      "cagr": 0.9092,
+      "mdd": 0.1952,
+      "sharpe": 2.0097,
+      "turnover": 4.9881,
+      "exposure": 0.4523
+     },
+     "donchian20_20_atr3": {
+      "days": 367,
+      "trades": 10,
+      "total": 0.864,
+      "cagr": 0.8608,
+      "mdd": 0.3308,
+      "sharpe": 1.7937,
+      "turnover": 9.9772,
+      "exposure": 0.6649
+     }
+    }
+   }
+  ],
+  "stitched": {
+   "d0": {
+    "days": 1462,
+    "trades": 0,
+    "total": 1.2908,
+    "cagr": 0.2301,
+    "mdd": 0.3809,
+    "sharpe": 0.9236,
+    "turnover": 0.0,
+    "exposure": 0.0
+   },
+   "d5": {
+    "days": 1462,
+    "trades": 0,
+    "total": 0.7848,
+    "cagr": 0.1557,
+    "mdd": 0.4618,
+    "sharpe": 0.6722,
+    "turnover": 0.0,
+    "exposure": 0.0
+   }
+  }
+ },
+ "baselines": {
+  "buy_and_hold": {
+   "is": {
+    "d0": {
+     "days": 2558,
+     "trades": 1,
+     "total": 6.2291,
+     "cagr": 0.3263,
+     "mdd": 0.8687,
+     "sharpe": 0.7714,
+     "turnover": 0.1427,
+     "exposure": 1.0
+    },
+    "d5": {
+     "days": 2558,
+     "trades": 1,
+     "total": 6.2291,
+     "cagr": 0.3263,
+     "mdd": 0.8687,
+     "sharpe": 0.7714,
+     "turnover": 0.1427,
+     "exposure": 1.0
+    }
+   },
+   "holdout": {
+    "d0": {
+     "days": 642,
+     "trades": 1,
+     "total": -0.173,
+     "cagr": -0.1025,
+     "mdd": 0.4997,
+     "sharpe": -0.0906,
+     "turnover": 0.5694,
+     "exposure": 1.0
+    },
+    "d5": {
+     "days": 642,
+     "trades": 1,
+     "total": -0.173,
+     "cagr": -0.1025,
+     "mdd": 0.4997,
+     "sharpe": -0.0906,
+     "turnover": 0.5694,
+     "exposure": 1.0
+    }
+   },
+   "wfo": {
+    "days": 1462,
+    "trades": 0,
+    "total": 3.3459,
+    "cagr": 0.4435,
+    "mdd": 0.7418,
+    "sharpe": 0.9511,
+    "turnover": 0.0,
+    "exposure": 0.0
+   }
+  },
+  "official_dd20_10": {
+   "is": {
+    "d0": {
+     "days": 2558,
+     "trades": 27,
+     "total": 5.5561,
+     "cagr": 0.3079,
+     "mdd": 0.4712,
+     "sharpe": 1.0298,
+     "turnover": 3.8559,
+     "exposure": 0.3116
+    },
+    "d5": {
+     "days": 2558,
+     "trades": 27,
+     "total": 4.6435,
+     "cagr": 0.2802,
+     "mdd": 0.5001,
+     "sharpe": 0.9582,
+     "turnover": 3.8559,
+     "exposure": 0.3112
+    }
+   },
+   "holdout": {
+    "d0": {
+     "days": 642,
+     "trades": 4,
+     "total": -0.0719,
+     "cagr": -0.0416,
+     "mdd": 0.2495,
+     "sharpe": -0.1687,
+     "turnover": 2.2789,
+     "exposure": 0.3692
+    },
+    "d5": {
+     "days": 642,
+     "trades": 4,
+     "total": -0.0652,
+     "cagr": -0.0377,
+     "mdd": 0.2387,
+     "sharpe": -0.1445,
+     "turnover": 2.2789,
+     "exposure": 0.3707
+    }
+   },
+   "wfo": {
+    "days": 1462,
+    "trades": 0,
+    "total": 0.768,
+    "cagr": 0.153,
+    "mdd": 0.5001,
+    "sharpe": 0.6006,
+    "turnover": 0.0,
+    "exposure": 0.0
+   }
+  },
+  "shadow_dd12.5_5": {
+   "is": {
+    "d0": {
+     "days": 2558,
+     "trades": 19,
+     "total": 9.2839,
+     "cagr": 0.3947,
+     "mdd": 0.2877,
+     "sharpe": 1.3863,
+     "turnover": 2.7132,
+     "exposure": 0.2134
+    },
+    "d5": {
+     "days": 2558,
+     "trades": 19,
+     "total": 9.7224,
+     "cagr": 0.403,
+     "mdd": 0.3117,
+     "sharpe": 1.4131,
+     "turnover": 2.7132,
+     "exposure": 0.2131
+    }
+   },
+   "holdout": {
+    "d0": {
+     "days": 642,
+     "trades": 4,
+     "total": -0.0508,
+     "cagr": -0.0293,
+     "mdd": 0.2325,
+     "sharpe": -0.1055,
+     "turnover": 2.2789,
+     "exposure": 0.3458
+    },
+    "d5": {
+     "days": 642,
+     "trades": 4,
+     "total": -0.0632,
+     "cagr": -0.0365,
+     "mdd": 0.237,
+     "sharpe": -0.1531,
+     "turnover": 2.2789,
+     "exposure": 0.3474
+    }
+   },
+   "wfo": {
+    "days": 1462,
+    "trades": 0,
+    "total": 2.4794,
+    "cagr": 0.3655,
+    "mdd": 0.3117,
+    "sharpe": 1.2645,
+    "turnover": 0.0,
+    "exposure": 0.0
+   }
+  },
+  "donchian20_20_atr3": {
+   "is": {
+    "d0": {
+     "days": 2558,
+     "trades": 60,
+     "total": 26.7731,
+     "cagr": 0.6072,
+     "mdd": 0.6205,
+     "sharpe": 1.342,
+     "turnover": 8.5687,
+     "exposure": 0.4891
+    },
+    "d5": {
+     "days": 2558,
+     "trades": 60,
+     "total": 18.807,
+     "cagr": 0.5315,
+     "mdd": 0.6646,
+     "sharpe": 1.2192,
+     "turnover": 8.5688,
+     "exposure": 0.4894
+    }
+   },
+   "holdout": {
+    "d0": {
+     "days": 642,
+     "trades": 19,
+     "total": 0.0443,
+     "cagr": 0.025,
+     "mdd": 0.1915,
+     "sharpe": 0.2242,
+     "turnover": 10.8241,
+     "exposure": 0.4299
+    },
+    "d5": {
+     "days": 642,
+     "trades": 19,
+     "total": 0.0775,
+     "cagr": 0.0434,
+     "mdd": 0.1775,
+     "sharpe": 0.3195,
+     "turnover": 10.8241,
+     "exposure": 0.4283
+    }
+   },
+   "wfo": {
+    "days": 1462,
+    "trades": 0,
+    "total": 3.5537,
+    "cagr": 0.4604,
+    "mdd": 0.425,
+    "sharpe": 1.1949,
+    "turnover": 0.0,
+    "exposure": 0.0
+   }
+  }
+ },
+ "candidates": [
+  {
+   "rank": 1,
+   "fitness": 2.1364,
+   "genome": {
+    "p": {
+     "hold": {},
+     "tsmom": {
+      "tf": "4h",
+      "days": 90
+     },
+     "donchian": {
+      "tf": "4h",
+      "n_in": 10,
+      "n_out": 20,
+      "atr_k": 2
+     },
+     "volbreak": {
+      "k": 0.5,
+      "ma_days": 3
+     },
+     "meanrev": {
+      "tf": "1d",
+      "rsi_n": 2,
+      "lo": 10,
+      "hi": 50,
+      "trend": 1
+     },
+     "rotation": {
+      "days": 14,
+      "top_k": 2,
+      "every": 1
+     },
+     "pairs": {
+      "n": 120,
+      "z0": 1.5
+     }
+    },
+    "gate": "none",
+    "vt": 0.6,
+    "band": 0.0,
+    "regime_switch": 1,
+    "w_bull": [
+     0.0,
+     0.0,
+     0.75,
+     0.0,
+     0.0,
+     0.5,
+     0.0
+    ],
+    "w_side": [
+     0.0,
+     0.0,
+     1.0,
+     0.5,
+     0.75,
+     0.25,
+     0.0
+    ]
+   },
+   "key": "gate=none|vt=0.6|band=0.0|regime_switch=1|wb=0.0,0.0,0.75,0.0,0.0,0.5,0.0|ws=0.0,0.0,1.0,0.5,0.75,0.25,0.0|donchian(atr_k=2,n_in=10,n_out=20,tf=4h)|volbreak(k=0.5,ma_days=3)|meanrev(hi=50,lo=10,rsi_n=2,tf=1d,trend=1)|rotation(days=14,every=1,top_k=2)",
+   "desc": "donchian[tf=4h,n_in=10,n_out=20,atr_k=2]xbull 0.75/side 1.0 + volbreak[k=0.5,ma_days=3]xbull 0.0/side 0.5 + meanrev[tf=1d,rsi_n=2,lo=10,hi=50,trend=1]xbull 0.0/side 0.75 + rotation[days=14,top_k=2,every=1]xbull 0.5/side 0.25 | gate=none vt=0.6 band=0.0 switch=1",
+   "is": {
+    "d0": {
+     "days": 2558,
+     "trades": 3786,
+     "total": 162.6885,
+     "cagr": 1.0703,
+     "mdd": 0.207,
+     "sharpe": 2.3788,
+     "turnover": 52.4625,
+     "exposure": 0.2763
+    },
+    "d5": {
+     "days": 2558,
+     "trades": 3788,
+     "total": 106.6462,
+     "cagr": 0.9501,
+     "mdd": 0.2628,
+     "sharpe": 2.1765,
+     "turnover": 52.5255,
+     "exposure": 0.2915
+    }
+   },
+   "holdout": {
+    "d0": {
+     "days": 642,
+     "trades": 897,
+     "total": -0.1331,
+     "cagr": -0.0781,
+     "mdd": 0.2751,
+     "sharpe": -0.3133,
+     "turnover": 60.1551,
+     "exposure": 0.2748
+    },
+    "d5": {
+     "days": 642,
+     "trades": 894,
+     "total": -0.1923,
+     "cagr": -0.1145,
+     "mdd": 0.2825,
+     "sharpe": -0.5234,
+     "turnover": 59.9837,
+     "exposure": 0.2848
+    }
+   },
+   "dsr": 0.9994,
+   "bh_holdout_mdd": 0.4997,
+   "wfo_family_sharpe": 0.6722,
+   "survives": false,
+   "beats_official_holdout_d5": false
+  },
+  {
+   "rank": 2,
+   "fitness": 2.0829,
+   "genome": {
+    "p": {
+     "hold": {},
+     "tsmom": {
+      "tf": "4h",
+      "days": 90
+     },
+     "donchian": {
+      "tf": "4h",
+      "n_in": 10,
+      "n_out": 20,
+      "atr_k": 2
+     },
+     "volbreak": {
+      "k": 0.5,
+      "ma_days": 5
+     },
+     "meanrev": {
+      "tf": "1d",
+      "rsi_n": 3,
+      "lo": 10,
+      "hi": 70,
+      "trend": 1
+     },
+     "rotation": {
+      "days": 14,
+      "top_k": 3,
+      "every": 1
+     },
+     "pairs": {
+      "n": 20,
+      "z0": 1.5
+     }
+    },
+    "gate": "none",
+    "vt": 0.6,
+    "band": 0.05,
+    "regime_switch": 1,
+    "w_bull": [
+     0.0,
+     0.25,
+     0.5,
+     0.0,
+     0.0,
+     0.5,
+     0.0
+    ],
+    "w_side": [
+     0.0,
+     0.0,
+     0.75,
+     0.0,
+     0.75,
+     0.25,
+     0.0
+    ]
+   },
+   "key": "gate=none|vt=0.6|band=0.05|regime_switch=1|wb=0.0,0.25,0.5,0.0,0.0,0.5,0.0|ws=0.0,0.0,0.75,0.0,0.75,0.25,0.0|tsmom(days=90,tf=4h)|donchian(atr_k=2,n_in=10,n_out=20,tf=4h)|meanrev(hi=70,lo=10,rsi_n=3,tf=1d,trend=1)|rotation(days=14,every=1,top_k=3)",
+   "desc": "tsmom[tf=4h,days=90]xbull 0.25/side 0.0 + donchian[tf=4h,n_in=10,n_out=20,atr_k=2]xbull 0.5/side 0.75 + meanrev[tf=1d,rsi_n=3,lo=10,hi=70,trend=1]xbull 0.0/side 0.75 + rotation[days=14,top_k=3,every=1]xbull 0.5/side 0.25 | gate=none vt=0.6 band=0.05 switch=1",
+   "is": {
+    "d0": {
+     "days": 2558,
+     "trades": 1780,
+     "total": 107.7255,
+     "cagr": 0.9529,
+     "mdd": 0.2184,
+     "sharpe": 2.2882,
+     "turnover": 36.7824,
+     "exposure": 0.339
+    },
+    "d5": {
+     "days": 2558,
+     "trades": 1786,
+     "total": 95.4992,
+     "cagr": 0.9199,
+     "mdd": 0.2808,
+     "sharpe": 2.2022,
+     "turnover": 36.8043,
+     "exposure": 0.3394
+    }
+   },
+   "holdout": {
+    "d0": {
+     "days": 642,
+     "trades": 473,
+     "total": -0.0804,
+     "cagr": -0.0466,
+     "mdd": 0.2593,
+     "sharpe": -0.1369,
+     "turnover": 40.1666,
+     "exposure": 0.3405
+    },
+    "d5": {
+     "days": 642,
+     "trades": 510,
+     "total": -0.1549,
+     "cagr": -0.0914,
+     "mdd": 0.2692,
+     "sharpe": -0.3787,
+     "turnover": 41.1261,
+     "exposure": 0.3367
+    }
+   },
+   "dsr": 0.9971,
+   "bh_holdout_mdd": 0.4997,
+   "wfo_family_sharpe": 0.6722,
+   "survives": false,
+   "beats_official_holdout_d5": false
+  },
+  {
+   "rank": 3,
+   "fitness": 2.0635,
+   "genome": {
+    "p": {
+     "hold": {},
+     "tsmom": {
+      "tf": "4h",
+      "days": 90
+     },
+     "donchian": {
+      "tf": "4h",
+      "n_in": 10,
+      "n_out": 20,
+      "atr_k": 2
+     },
+     "volbreak": {
+      "k": 0.5,
+      "ma_days": 5
+     },
+     "meanrev": {
+      "tf": "1d",
+      "rsi_n": 3,
+      "lo": 10,
+      "hi": 70,
+      "trend": 1
+     },
+     "rotation": {
+      "days": 14,
+      "top_k": 3,
+      "every": 1
+     },
+     "pairs": {
+      "n": 120,
+      "z0": 1.5
+     }
+    },
+    "gate": "none",
+    "vt": 0.6,
+    "band": 0.0,
+    "regime_switch": 1,
+    "w_bull": [
+     0.0,
+     0.25,
+     0.5,
+     0.0,
+     0.25,
+     0.5,
+     0.0
+    ],
+    "w_side": [
+     0.0,
+     0.0,
+     0.75,
+     0.0,
+     0.75,
+     0.0,
+     0.0
+    ]
+   },
+   "key": "gate=none|vt=0.6|band=0.0|regime_switch=1|wb=0.0,0.25,0.5,0.0,0.25,0.5,0.0|ws=0.0,0.0,0.75,0.0,0.75,0.0,0.0|tsmom(days=90,tf=4h)|donchian(atr_k=2,n_in=10,n_out=20,tf=4h)|meanrev(hi=70,lo=10,rsi_n=3,tf=1d,trend=1)|rotation(days=14,every=1,top_k=3)",
+   "desc": "tsmom[tf=4h,days=90]xbull 0.25/side 0.0 + donchian[tf=4h,n_in=10,n_out=20,atr_k=2]xbull 0.5/side 0.75 + meanrev[tf=1d,rsi_n=3,lo=10,hi=70,trend=1]xbull 0.25/side 0.75 + rotation[days=14,top_k=3,every=1]xbull 0.5/side 0.0 | gate=none vt=0.6 band=0.0 switch=1",
+   "is": {
+    "d0": {
+     "days": 2558,
+     "trades": 3323,
+     "total": 46.8555,
+     "cagr": 0.737,
+     "mdd": 0.2522,
+     "sharpe": 2.259,
+     "turnover": 31.9896,
+     "exposure": 0.2791
+    },
+    "d5": {
+     "days": 2558,
+     "trades": 3323,
+     "total": 39.6212,
+     "cagr": 0.6968,
+     "mdd": 0.2324,
+     "sharpe": 2.1594,
+     "turnover": 32.0382,
+     "exposure": 0.28
+    }
+   },
+   "holdout": {
+    "d0": {
+     "days": 642,
+     "trades": 693,
+     "total": -0.0434,
+     "cagr": -0.0249,
+     "mdd": 0.2218,
+     "sharpe": -0.0582,
+     "turnover": 34.2478,
+     "exposure": 0.2867
+    },
+    "d5": {
+     "days": 642,
+     "trades": 688,
+     "total": -0.1062,
+     "cagr": -0.0619,
+     "mdd": 0.2194,
+     "sharpe": -0.2826,
+     "turnover": 34.1455,
+     "exposure": 0.2834
+    }
+   },
+   "dsr": 0.996,
+   "bh_holdout_mdd": 0.4997,
+   "wfo_family_sharpe": 0.6722,
+   "survives": false,
+   "beats_official_holdout_d5": false
+  }
+ ],
+ "runtime_s": 229.7
+}

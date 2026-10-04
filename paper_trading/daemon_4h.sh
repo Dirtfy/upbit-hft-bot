@@ -24,7 +24,18 @@ OFFSET=90                   # wake this many seconds AFTER each 4h boundary
 source "$(dirname "$SELF")/daemon_lib.sh"
 
 daemon_tick() {
+  local rc
   "$PY" paper_trading/collect_4h.py
+  rc=$?
+  # Cycle 31 (owner mission 2026-10-04), both AFTER the collector and unable to
+  # change its result: (1) the evolved-ensemble SHADOW books (official=false)
+  # catch up on closed 1h candles; (2) a detached strategy-evolution run is
+  # spawned iff the last one is older than 7 days. Failures are logged, ignored.
+  "$PY" paper_trading/ensemble_books/ensemble_book.py \
+    || echo "ensemble_books tick FAILED (collector unaffected)"
+  research/evolution/run_evolution.sh maybe \
+    || echo "evolution spawn FAILED (collector unaffected)"
+  return $rc
 }
 
 daemon_next_sleep() {

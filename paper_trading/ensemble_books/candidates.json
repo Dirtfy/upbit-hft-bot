@@ -1,0 +1,137 @@
+{
+ "_note": "Frozen SHADOW books (official=false). Never edit a launched book; add new ones. kind=evolved books are auto-added by ensemble_book.promote() only when they pass evolve.SURVIVE.",
+ "books": [
+  {
+   "name": "ret_donchian20_atr3",
+   "kind": "return_baseline",
+   "key": "gate=none|vt=0|band=0.0|regime_switch=0|wb=0.0,0.0,1.0,0.0,0.0,0.0,0.0|donchian(atr_k=3,n_in=20,n_out=20,tf=1d)",
+   "desc": "donchian[tf=1d,n_in=20,n_out=20,atr_k=3] | gate=none vt=0 band=0.0 switch=0",
+   "genome": {
+    "p": {
+     "hold": {},
+     "tsmom": {
+      "tf": "4h",
+      "days": 180
+     },
+     "donchian": {
+      "tf": "1d",
+      "n_in": 20,
+      "n_out": 20,
+      "atr_k": 3
+     },
+     "volbreak": {
+      "k": 0.6,
+      "ma_days": 5
+     },
+     "meanrev": {
+      "tf": "4h",
+      "rsi_n": 5,
+      "lo": 30,
+      "hi": 50,
+      "trend": 0
+     },
+     "rotation": {
+      "days": 30,
+      "top_k": 1,
+      "every": 1
+     },
+     "pairs": {
+      "n": 120,
+      "z0": 1.5
+     }
+    },
+    "gate": "none",
+    "vt": 0,
+    "band": 0.0,
+    "regime_switch": 0,
+    "w_bull": [
+     0.0,
+     0.0,
+     1.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "w_side": [
+     0.0,
+     0.0,
+     1.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "launch_utc": "2026-10-04T04:00:00",
+   "official": false,
+   "evidence": "Cycle 3-6 return strategy (not evolved). Only book passing the pre-registered survival rule on the 2025-01..2026-10 holdout: d0 CAGR +2.5%, d5 +4.3%, MDD 17.8%, Sharpe 0.32; B&H d5 -10.2%"
+  },
+  {
+   "name": "ctrl_evo_cand3_failed_oos",
+   "kind": "control",
+   "key": "gate=none|vt=0.6|band=0.0|regime_switch=1|wb=0.0,0.25,0.5,0.0,0.25,0.5,0.0|ws=0.0,0.0,0.75,0.0,0.75,0.0,0.0|tsmom(days=90,tf=4h)|donchian(atr_k=2,n_in=10,n_out=20,tf=4h)|meanrev(hi=70,lo=10,rsi_n=3,tf=1d,trend=1)|rotation(days=14,every=1,top_k=3)",
+   "desc": "tsmom[tf=4h,days=90]xbull 0.25/side 0.0 + donchian[tf=4h,n_in=10,n_out=20,atr_k=2]xbull 0.5/side 0.75 + meanrev[tf=1d,rsi_n=3,lo=10,hi=70,trend=1]xbull 0.25/side 0.75 + rotation[days=14,top_k=3,every=1]xbull 0.5/side 0.0 | gate=none vt=0.6 band=0.0 switch=1",
+   "genome": {
+    "p": {
+     "hold": {},
+     "tsmom": {
+      "tf": "4h",
+      "days": 90
+     },
+     "donchian": {
+      "tf": "4h",
+      "n_in": 10,
+      "n_out": 20,
+      "atr_k": 2
+     },
+     "volbreak": {
+      "k": 0.5,
+      "ma_days": 5
+     },
+     "meanrev": {
+      "tf": "1d",
+      "rsi_n": 3,
+      "lo": 10,
+      "hi": 70,
+      "trend": 1
+     },
+     "rotation": {
+      "days": 14,
+      "top_k": 3,
+      "every": 1
+     },
+     "pairs": {
+      "n": 120,
+      "z0": 1.5
+     }
+    },
+    "gate": "none",
+    "vt": 0.6,
+    "band": 0.0,
+    "regime_switch": 1,
+    "w_bull": [
+     0.0,
+     0.25,
+     0.5,
+     0.0,
+     0.25,
+     0.5,
+     0.0
+    ],
+    "w_side": [
+     0.0,
+     0.0,
+     0.75,
+     0.0,
+     0.75,
+     0.0,
+     0.0
+    ]
+   },
+   "launch_utc": "2026-10-04T04:00:00",
+   "official": false,
+   "evidence": "CONTROL, NOT a survivor: best evolved ensemble of run 2026-10-04T03:36:32Z (IS Sharpe 2.16) FAILED the holdout (d5 CAGR -6.2%). Tracked forward to measure overfitting, not as a recommendation."
+  }
+ ]
+}

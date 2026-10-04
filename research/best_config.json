@@ -1,6 +1,6 @@
 {
   "updated": "2026-10-04",
-  "last_cycle": 30,
+  "last_cycle": 31,
   "tradable_capital_cap": {
     "added_cycle": 15,
     "param": "config.BASE_TRADABLE_CAPITAL_KRW",
@@ -191,5 +191,17 @@
     "cost": "2020 +107% vs +148%",
     "script": "backtest/exit_sweep.py",
     "test": "tests/test_exit_sweep.py 4/4"
+  },
+  "ensemble_evolution": {
+    "cycle": 31,
+    "doc": "research/ENSEMBLE_EVOLUTION.md",
+    "results": "research/evolution/results/RESULTS.md",
+    "verdict": "GA-evolved multi-sleeve ensembles (3,463 configs, WFO 2021-24 + untouched holdout 2025-01..now, fee+slip 0.10%/side, d0+d5 fills) did NOT beat simple baselines after costs: all 3 candidates negative on holdout (d5 -6..-12%). Only Donchian 1d 20/20 ATR3 positive on holdout (d5 +4.3%).",
+    "shadow_books": [
+      "paper_trading/ensemble_books/ret_donchian20_atr3 (official=false)",
+      "paper_trading/ensemble_books/ctrl_evo_cand3_failed_oos (official=false, control)"
+    ],
+    "official_config_changed": false,
+    "loop": "research/evolution/run_evolution.sh maybe, from daemon_4h tick, weekly, token-free; survivors auto-promoted (max 3)"
   }
 }

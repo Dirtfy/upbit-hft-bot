@@ -1328,3 +1328,21 @@ so the host cron covers it. It was backfilled from the official first candle
 1,000,000 KRW (BTC is about 35% below its 1-year high, so both settings say
 bear). The official files were verified byte-identical (sha1) across the launch.
 tests/test_shadow_exit_book.py passes 12/12.
+
+## Cycle 31 (2026-10-04): mixing strategies + evolving them with backtests (owner mission)
+Built `research/evolution/` (lab.py, evolve.py, data_1h.py, run_evolution.sh). There are 7 sleeves: hold, TS momentum, Donchian, vol-breakout k, RSI/BB mean reversion, cross-coin rotation and BTC/ETH pairs. They run on 1d/4h/1h bars for 6 KRW coins. A meta layer adds per-regime weights, an optional dd 20/10 or 12.5/5 gate, a vol target and a rebalance band. A (μ+λ) GA searches it. Fills are d0 (next-hour open) and d5 (5h blind window), and costs are 0.05% fee plus 0.05% slippage per side. Overfitting controls:
+- walk-forward over the 2021-24 test years;
+- holdout 2025-01-01..now, physically excluded from the search and looked at once;
+- cumulative trial count with deflated Sharpe;
+- a survival rule fixed before the holdout ran.
+
+**Result: nothing evolved beats the baselines after costs.**
+- Stitched WFO d5: CAGR +15.6% and MDD 46%. That compares with 12.5/5 at +36.5% and Donchian at +46.0%.
+- All 3 holdout candidates were negative (d5 −6% to −12%, 500–900 trades) while the IS Sharpe was about 2.2. That is classic overfitting.
+- Only Donchian 1d 20/20 ATR3 made money on the holdout (d5 +4.3%, MDD 17.8%).
+
+Shadow books (official=false, token-free from the 4h daemon tick):
+- `ret_donchian20_atr3`;
+- `ctrl_evo_cand3_failed_oos` as a control.
+
+The GA re-runs weekly, and any future survivor is auto-promoted (max 3). The official 20/10 and 12.5/5 books are untouched (checked by tests/test_evolution.py, 21/21). The full write-up is in research/ENSEMBLE_EVOLUTION.md.

@@ -113,6 +113,16 @@ paper_trading/daemon_4h.sh logs      # 데몬 로그 tail
 비교표는 `shadow_exit_book/COMPARE.md`, 요약 한 줄은 `daemon_paper.sh status`.
 (`shadow/`의 반사실 리플레이와는 별개다.)
 
+### 앙상블 SHADOW 북 (Cycle 31, 2026-10-04)
+`ensemble_books/`에는 전략 섞기와 진화(GA) 실험(`research/evolution/`)에서 나온 **official=false** 장부를 둔다.
+- 각 장부는 자본 1,000,000 KRW, 노출 상한 1M, 롱 전용이다. 수수료와 슬리피지는 각 0.05%이고, 체결은 d0(다음 시간 시가)와 d5(5시간 블라인드) 두 가지로 따로 기록한다.
+- `daemon_4h.sh` 틱마다 토큰 없이 갱신된다.
+- 보는 곳:
+  - `ensemble_books/COMPARE.md`: 공식, 12.5/5, 앙상블 장부를 나란히 비교
+  - `ensemble_books/<book>/SUMMARY.md`
+- 진화 탐색은 주 1회 자동으로 돈다(`research/evolution/run_evolution.sh status`). 사전에 정한 생존 규칙을 통과한 후보만 자동으로 새 장부가 되며, 최대 3개다.
+- 공식 원장과 12.5/5 장부는 절대 건드리지 않는다.
+
 ### 4h 모의투자 트랙(선택) — 일봉 원장과 분리
 현재 방어 전략의 장세필터는 **일봉 기준(SMA200 등)**이라 4h봉에 그대로 적용하면
 의미가 달라진다. 그래서 이번 단계는 **4h 데이터 축적까지만** 수행한다. 4h 기반
