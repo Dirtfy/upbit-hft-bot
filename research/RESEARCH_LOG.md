@@ -1346,3 +1346,10 @@ Shadow books (official=false, token-free from the 4h daemon tick):
 - `ctrl_evo_cand3_failed_oos` as a control.
 
 The GA re-runs weekly, and any future survivor is auto-promoted (max 3). The official 20/10 and 12.5/5 books are untouched (checked by tests/test_evolution.py, 21/21). The full write-up is in research/ENSEMBLE_EVOLUTION.md.
+
+## Cycle 32 (2026-10-05): replay-consistency guard for the ensemble shadow books
+The ensemble books recompute from launch on every 4h tick and append only new days. Each tick now also checks that the recompute reproduces every already-logged day's equity (tolerance 1 KRW). Any drift means revised candles or a code change moved history. It is flagged in SUMMARY.md, COMPARE.md and the daemon log. The live books replay with 0 KRW drift. tests/test_evolution.py now passes 23/23 (+2 checks: a consistent replay, and a tampered history being flagged).
+Forward status, day 1 (2026-10-04, from the 04:00Z launch):
+- official and 12.5/5: both FLAT at 1,000,000;
+- ret_donchian20_atr3: long BTC, +1.24% for the day;
+- ctrl_evo_cand3: BTC/SOL/DOGE/ADA, +1.24%.

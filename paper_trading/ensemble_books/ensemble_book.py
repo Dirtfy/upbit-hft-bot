@@ -92,14 +92,19 @@ def load_books(path=CANDIDATES):
         return json.load(f)["books"]
 
 
-def _last_day(log_path):
-    last = None
+def _logged(log_path):
+    """day -> already-appended record (append-only ledger)."""
+    out = {}
     if os.path.exists(log_path):
         with open(log_path) as f:
             for line in f:
                 if line.strip():
-                    last = json.loads(line)["day"]
-    return last
+                    rec = json.loads(line)
+                    out[rec["day"]] = rec
+    return out
+
+
+DRIFT_TOL_KRW = 1.0               # rounding only; anything larger = history changed
 
 
 def run_book(mk, L, b, out_dir):
@@ -119,7 +124,9 @@ def run_book(mk, L, b, out_dir):
     eq0 = dict((h, e) for h, e in r[0].get("eq", []))
     eq5 = dict((h, e) for h, e in r[5].get("eq", []))
     log_path = os.path.join(out_dir, "paper_log.jsonl")
-    last = _last_day(log_path)
+    logged = _logged(log_path)
+    last = max(logged) if logged else None
+    drift = 0.0
     day_marks = [m for m in mk.day_marks if h0 < m <= mk.n]
     prev_h, new = h0, 0
     with open(log_path, "a") as f:
@@ -131,6 +138,10 @@ def run_book(mk, L, b, out_dir):
             if e0 is None:
                 prev_h = m
                 continue
+            if day in logged:
+                # the deterministic recompute must reproduce what was logged;
+                # a mismatch means revised candles or a code change moved history
+                drift = max(drift, abs(round(e0, 0) - logged[day]["equity_d0_krw"]))
             if last is None or day > last:
                 trades = [t for t in r[0].get("log", []) if prev_h <= t["hour"] < m]
                 rec = {"book": b["name"], "official": False, "day": day,
@@ -148,7 +159,8 @@ def run_book(mk, L, b, out_dir):
             prev_h = m
     st.update(status="running", equity_d0=r[0]["final_equity"], equity_d5=r[5]["final_equity"],
               weights=r[0]["final_w"], trades_d0=r[0]["trades"], trades_d5=r[5]["trades"],
-              days=len(day_marks), new_records=new,
+              days=len(day_marks), new_records=new, drift_krw=drift,
+              consistent=drift <= DRIFT_TOL_KRW,
               asof=mk.time_of(mk.n).strftime("%Y-%m-%dT%H:%MZ"))
     with open(os.path.join(out_dir, "SUMMARY.md"), "w") as f:
         f.write(_summary(st, b, [dict(t, time=mk.time_of(t["hour"]).strftime("%Y-%m-%d %H:%M"))
@@ -170,6 +182,7 @@ def _summary(st, b, log):
          f"- equity d5 (5h blind window): {st['equity_d5']:,.0f} KRW ({(st['equity_d5'] / CAPITAL - 1):+.2%})",
          f"- position now: {_fmt_w(st['weights'])}",
          f"- trades (d0): {st['trades_d0']}",
+         f"- replay check: {'OK (recompute == logged history)' if st.get('consistent', True) else 'DRIFT %.0f KRW vs logged history — investigate' % st['drift_krw']}",
          f"- selection evidence: {b.get('evidence', '-')}", "", "## Trades (d0)", "",
          "| time (UTC) | asset | side | price | KRW |", "|---|---|---|---|---|"]
     for t in log[-50:]:
@@ -203,7 +216,8 @@ def write_compare(statuses):
     for s in statuses:
         L.append(f"| {s['name']} (d0 / d5) | false | {s['equity_d0']:,.0f} / {s['equity_d5']:,.0f} | "
                  f"{(s['equity_d0'] / CAPITAL - 1) * 100:+.2f}% / {(s['equity_d5'] / CAPITAL - 1) * 100:+.2f}% | "
-                 f"{_fmt_w(s['weights'])} | {s.get('asof', s['status'])} |")
+                 f"{_fmt_w(s['weights'])} | {s.get('asof', s['status'])}"
+                 f"{'' if s.get('consistent', True) else ' DRIFT %.0f KRW' % s['drift_krw']} |")
     L += ["", "Ensemble books start at their own launch time (not 2026-09-24), so compare "
           "returns over the same dates only from the ensemble launch onward.", ""]
     for s in statuses:
@@ -244,7 +258,8 @@ def main():
     lines = write_compare(statuses)
     for s in statuses:
         print(f"{s['name']}: d0 {s['equity_d0']:,.0f} / d5 {s['equity_d5']:,.0f} KRW  "
-              f"pos {_fmt_w(s['weights'])}  (+{s.get('new_records', 0)} day records)")
+              f"pos {_fmt_w(s['weights'])}  (+{s.get('new_records', 0)} day records)"
+              f"{'' if s.get('consistent', True) else '  WARN replay drift %.0f KRW' % s['drift_krw']}")
     return lines
 
 

@@ -136,6 +136,15 @@ try:
     eb.run_book(mk, L, b, out)
     recs2 = [json.loads(x) for x in open(os.path.join(out, "paper_log.jsonl"))]
     check("rerun is idempotent (no duplicate days)", len(recs2) == len(recs))
+    st2 = eb.run_book(mk, L, b, out)
+    check("replay of logged history is consistent", st2["consistent"] and st2["drift_krw"] == 0)
+    lp = os.path.join(out, "paper_log.jsonl")
+    lines = open(lp).read().splitlines()
+    r0_ = json.loads(lines[3]); r0_["equity_d0_krw"] += 5000
+    lines[3] = json.dumps(r0_)
+    open(lp, "w").write("\n".join(lines) + "\n")
+    st3 = eb.run_book(mk, L, b, out)
+    check("tampered/revised history is flagged as drift", not st3["consistent"] and st3["drift_krw"] == 5000)
     big = max((t["krw"] for r in recs for t in r["trades_d0"] if t["side"] == "BUY"), default=0)
     check("no BUY deploys more than the 1,000,000 KRW cap", 0 < big <= 1_000_000 + 1)
     check("book starts with 1,000,000 KRW", abs(recs[0]["equity_d0_krw"] - 1_000_000) < 60_000)
