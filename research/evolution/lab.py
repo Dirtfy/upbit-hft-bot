@@ -512,8 +512,10 @@ def simulate(mk, events, start, end, delay=0, cost=COST, band=0.0, capital=1.0,
         return cash + sum(units[a] * px(a, hr) for a in range(A) if units[a])
 
     for m in marks + [None]:
-        stop = end if m is None else m
-        while qi < len(queue) and queue[qi][0] <= stop and (m is None or queue[qi][0] <= m):
+        # a mark at hour m is the equity BEFORE fills at m: those fills belong
+        # to the next day (same bucketing as the trade log), so a day's mark
+        # never changes once hour m has been seen (append-only forward books)
+        while qi < len(queue) and (m is None or queue[qi][0] < m):
             t, w = queue[qi]
             qi += 1
             if t >= end:

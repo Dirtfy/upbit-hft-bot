@@ -136,6 +136,11 @@ try:
     eb.run_book(mk, L, b, out)
     recs2 = [json.loads(x) for x in open(os.path.join(out, "paper_log.jsonl"))]
     check("rerun is idempotent (no duplicate days)", len(recs2) == len(recs))
+    # a fill exactly at a day boundary must not move that day's (already logged) mark
+    evb = [(240, lab.LONG_BTC), (480, lab.ZERO)]
+    short = lab.simulate(mk, evb, 0, 480, cost=0.001)["final_equity"]
+    longer = dict(lab.simulate(mk, evb, 0, 600, cost=0.001, record=True)["eq"])[480]
+    check("day mark excludes fills at the mark hour (append-only safe)", abs(short - longer) < 1e-9)
     st2 = eb.run_book(mk, L, b, out)
     check("replay of logged history is consistent", st2["consistent"] and st2["drift_krw"] == 0)
     lp = os.path.join(out, "paper_log.jsonl")

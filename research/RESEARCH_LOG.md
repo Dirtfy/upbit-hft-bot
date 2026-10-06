@@ -1353,3 +1353,10 @@ Forward status, day 1 (2026-10-04, from the 04:00Z launch):
 - official and 12.5/5: both FLAT at 1,000,000;
 - ret_donchian20_atr3: long BTC, +1.24% for the day;
 - ctrl_evo_cand3: BTC/SOL/DOGE/ADA, +1.24%.
+
+## Cycle 33 (2026-10-06): the replay guard caught a real bug, a day-boundary mark convention
+On its first live day, the Cycle 32 guard flagged a 128 KRW drift on `ctrl_evo_cand3_failed_oos`, for day 2026-10-05.
+- Cause: the book rebalanced exactly at 2026-10-06 00:00Z (sell DOGE etc., ~128k notional). `lab.simulate` applied fills at hour m BEFORE marking day m. When the day was logged at 00:01, the 00:00 fill did not exist yet. A later recompute therefore charged that fill's 0.1% cost to the already-logged day, while the trade log attributes the same fills to the next day.
+- Fix: the mark at hour m is now equity BEFORE fills at m, consistent with the trade-log bucketing, so logged days can never move.
+- Both live books now replay with 0 drift and the logged history is unchanged. Test added: a boundary fill doesn't move the mark.
+- Backtest impact: costs shift by at most one day. This is immaterial to Cycle 31 results, which were not re-run (re-running would add a holdout look).
