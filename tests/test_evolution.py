@@ -177,6 +177,21 @@ finally:
 check("real official + 12.5/5 shadow ledgers byte-identical",
       before == [open(p, "rb").read() if os.path.exists(p) else None for p in REAL])
 
+# ---- the weekly GA defers on a busy host and never spawns (no real run here)
+import subprocess  # noqa: E402
+sh = os.path.join(ROOT, "research", "evolution", "run_evolution.sh")
+latest_real = os.path.join(ROOT, "research", "evolution", "results", "latest.json")
+st_before = os.stat(latest_real).st_mtime if os.path.exists(latest_real) else None
+env = dict(os.environ, EVOLVE_EVERY_DAYS="0", EVOLVE_MIN_MEM_MB="99999999")
+out = subprocess.run(["bash", sh, "maybe"], env=env, capture_output=True, text=True).stdout
+check("due run defers when memory is short", "deferred" in out and "spawned" not in out)
+env = dict(os.environ, EVOLVE_EVERY_DAYS="0", EVOLVE_MIN_MEM_MB="0", EVOLVE_MAX_LOAD="-1")
+out = subprocess.run(["bash", sh, "run"], env=env, capture_output=True, text=True).stdout
+check("run defers when load is high (no GA started)", "deferred" in out and "START" in out
+      and "END" not in out)
+check("deferral leaves the GA results untouched",
+      st_before == (os.stat(latest_real).st_mtime if os.path.exists(latest_real) else None))
+
 failed = [n for n, ok in checks if not ok]
 print(f"\n{'ALL PASS' if not failed else 'FAILURES: ' + '; '.join(failed)} "
       f"({len(checks) - len(failed)}/{len(checks)})")

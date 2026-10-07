@@ -1360,3 +1360,11 @@ On its first live day, the Cycle 32 guard flagged a 128 KRW drift on `ctrl_evo_c
 - Fix: the mark at hour m is now equity BEFORE fills at m, consistent with the trade-log bucketing, so logged days can never move.
 - Both live books now replay with 0 drift and the logged history is unchanged. Test added: a boundary fill doesn't move the mark.
 - Backtest impact: costs shift by at most one day. This is immaterial to Cycle 31 results, which were not re-run (re-running would add a holdout look).
+
+## Cycle 34 (2026-10-07): the weekly GA yields to a busy host
+The owner suspects heavy jobs destabilise the shared server (standing rule 2026-10-05), and the host is small: 2 CPUs, about 400 MB available, swap in use. The GA itself is light, measured at about 64 MB peak RSS on one core. Even so, `run_evolution.sh` now:
+- defers a due run whenever MemAvailable is below 400 MB or the 1-minute loadavg is above nproc (both overridable via env). The 4h tick retries later.
+- runs under `ionice -c3 nice -n 19` with a 1 GB address-space cap.
+- reports in `status` whether the host is OK to run.
+
+Tests: test_evolution passes 27/27, adding 3 checks (memory deferral, load deferral, results untouched); no real GA was run.

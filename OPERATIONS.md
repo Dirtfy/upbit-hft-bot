@@ -178,7 +178,7 @@ paper_trading/daemon_paper.sh {start|ensure|status|stop|restart|logs}  # daily p
   `<book>/SUMMARY.md`. The tick then runs `research/evolution/run_evolution.sh maybe`,
   which starts a detached GA run only when `results/latest.json` is older than 7 days.
   It logs to `logs/evolution.log`, holds a lock at `logs/evolution.lock`, and
-  `run_evolution.sh status` reports on it.
+  `run_evolution.sh status` reports on it. A due run DEFERS (retried next tick) when MemAvailable < 400 MB or loadavg > nproc, and runs under ionice/nice with a 1 GB address-space cap.
 - **Paper trader** — runs `paper_trader.py` once per closed daily candle (00:05 UTC);
   appends one record to `paper_log.jsonl` / `JOURNAL.md` / `market_data_daily.csv`
   and regenerates `SUMMARY.md`. The decision is deterministic strategy code
