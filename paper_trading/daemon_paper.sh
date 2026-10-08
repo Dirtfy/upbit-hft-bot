@@ -43,6 +43,8 @@ daemon_tick() {
     "$PY" paper_trading/shadow_exit_book/shadow_book.py \
       || echo "shadow_exit_book tick FAILED (official book unaffected)"
   fi
+  # Read-only period report over every book (PERIOD_REPORT.md), ready for ~10/24.
+  "$PY" paper_trading/period_report.py || echo "period_report FAILED (books unaffected)"
   return $rc
 }
 

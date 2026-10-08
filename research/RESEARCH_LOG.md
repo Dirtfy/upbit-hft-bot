@@ -1368,3 +1368,19 @@ The owner suspects heavy jobs destabilise the shared server (standing rule 2026-
 - reports in `status` whether the host is OK to run.
 
 Tests: test_evolution passes 27/27, adding 3 checks (memory deferral, load deferral, results untouched); no real GA was run.
+
+## Cycle 35 (2026-10-08): end-of-period report, ready ahead of ~10/24
+`paper_trading/period_report.py` writes `paper_trading/PERIOD_REPORT.md` and covers:
+- every book: official 20/10, shadow 12.5/5 and the ensemble books;
+- a BTC buy-and-hold benchmark over the same candles (entry cost 0.1%);
+- days, return, max DD on end-of-day equity, trades, and FLAT days;
+- official vs 12.5/5 decision divergences;
+- an interim or FINAL label (final once the official candle reaches 2026-10-24).
+
+It is read-only and deterministic, and runs on every daily paper tick after the shadow book. A failure there cannot affect the books. tests/test_period_report.py passes 7/7 and checks that the ledgers stay byte-identical.
+
+Interim result, day 14 (candle 10-07):
+- official and 12.5/5: 1,000,000, FLAT on 14/14 days, 0 divergences;
+- BTC B&H: −2.13%;
+- Donchian book: −1.64% (4 days);
+- control: +0.04%.
