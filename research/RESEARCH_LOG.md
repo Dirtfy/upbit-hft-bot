@@ -1384,3 +1384,12 @@ Interim result, day 14 (candle 10-07):
 - BTC B&H: −2.13%;
 - Donchian book: −1.64% (4 days);
 - control: +0.04%.
+
+## Cycle 36 (2026-10-09): re-entry outlook in PERIOD_REPORT
+Both daily books have been FLAT for 15/15 days with 0 divergences. The 10/24 verdict question is whether they can diverge at all before then. PERIOD_REPORT.md now shows the lowest constant BTC close that would flip each book to long (regime.py: close > SMA200 and drawdown ≤ dd_exit from the 365-day high), for tomorrow and for 10/24. Highs leaving the window are accounted for. It is exact under a constant-price path, and a test checks it against `regime.compute_regimes`. Its daily closes come from data/1h and match market_data_daily.csv exactly, and the 365-day high (177,616,000, 2025-10-09) matches the ledger.
+
+As of the close of 2026-10-08 (112,360,000), BTC must rise and hold by 10/24:
+- official: ≥152.6M, +35.8%;
+- 12.5/5: ≥161.0M, +43.3%.
+
+So the forward period will almost certainly end with 0 divergences. The 10/24 decision must rest on the Cycle 29 backtest evidence plus operational soundness, not on forward P&L. tests/test_period_report.py passes 9/9.
