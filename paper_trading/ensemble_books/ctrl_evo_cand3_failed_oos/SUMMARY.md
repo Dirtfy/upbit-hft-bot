@@ -1,10 +1,10 @@
 # SHADOW ensemble book `ctrl_evo_cand3_failed_oos` (official=false)
 
 공식 원장이 아님. 진화 탐색(research/evolution)에서 걸러진 후보를 동결해 forward로 굴리는 그림자 장부.
-- launched: 2026-10-04T04:00:00 UTC, as of 2026-10-09T12:00Z
+- launched: 2026-10-04T04:00:00 UTC, as of 2026-10-10T12:00Z
 - strategy: `tsmom[tf=4h,days=90]xbull 0.25/side 0.0 + donchian[tf=4h,n_in=10,n_out=20,atr_k=2]xbull 0.5/side 0.75 + meanrev[tf=1d,rsi_n=3,lo=10,hi=70,trend=1]xbull 0.25/side 0.75 + rotation[days=14,top_k=3,every=1]xbull 0.5/side 0.0 | gate=none vt=0.6 band=0.0 switch=1`
-- equity d0 (next-hour fill): 985,801 KRW (-1.42%)
-- equity d5 (5h blind window): 985,402 KRW (-1.46%)
+- equity d0 (next-hour fill): 984,651 KRW (-1.53%)
+- equity d5 (5h blind window): 984,256 KRW (-1.57%)
 - position now: BTC 17%
 - trades (d0): 17
 - replay check: OK (recompute == logged history)

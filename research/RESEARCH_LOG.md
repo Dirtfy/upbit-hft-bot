@@ -1393,3 +1393,22 @@ As of the close of 2026-10-08 (112,360,000), BTC must rise and hold by 10/24:
 - 12.5/5: ≥161.0M, +43.3%.
 
 So the forward period will almost certainly end with 0 divergences. The 10/24 decision must rest on the Cycle 29 backtest evidence plus operational soundness, not on forward P&L. tests/test_period_report.py passes 9/9.
+
+## Cycle 37 (2026-10-10): cross-coin check of the 12.5/5 exit candidate. PROPOSAL, config unchanged
+Cycle 29 chose 12.5/5 on one asset (daily KRW-BTC). Cycle 36 showed the forward run cannot test it before 10/24. So `backtest/exit_cross_coin.py` runs the same long_flat rule on the other KRW coins in data/1h/, resampled to Upbit daily candles (00:00 UTC). Nothing was tuned on these coins. Check: the BTC resample matches data/krw_btc_1d.csv on 3,285 of 3,286 common days. The one mismatch is 2026-09-27, which was still forming in that file. BTC reproduces Cycle 29 (22.3% / 46.7% live).
+
+| coin | span | live 20/10 CAGR / maxDD / Sharpe | 12.5/5 CAGR / maxDD / Sharpe | trades L/C | plateau (18 pts) Sharpe>live / MDD<live |
+|---|---|---|---|---|---|
+| BTC | 2017-09.. | 22.3% / 46.7% / 0.86 | 28.8% / 28.5% / 1.16 | 15/11 | 18 / 18 |
+| ETH | 2017-09.. | 25.1% / 50.8% / 0.83 | 20.7% / 35.6% / 0.80 | 10/14 | 5 / 18 |
+| XRP | 2017-09.. | 19.4% / 57.0% / 0.58 | 14.4% / 38.5% / 0.55 | 11/12 | 10 / 18 |
+| ADA | 2017-10.. | 24.8% / 60.2% / 0.72 | 20.2% / 43.7% / 0.67 | 12/16 | 1 / 18 |
+| DOGE | 2021-02.. | 8.5% / 38.4% / 0.41 | 17.8% / 28.9% / 0.71 | 5/5 | 18 / 18 |
+| SOL | 2021-10.. | 27.7% / 38.1% / 0.94 | 17.8% / 37.4% / 0.75 | 4/8 | 0 / 16 |
+
+Results on the 5 non-BTC coins:
+- 12.5/5 cuts maxDD on 5 of 5, by 1 to 18 points, and so does almost every point in the plateau.
+- It beats live on CAGR on only 1 of 5 coins and on Sharpe on only 1 of 5.
+- On ETH, XRP, ADA and SOL it gives up 4 to 10 CAGR points and trades more often, because the tighter stop gets shaken out in bull-market corrections.
+
+**Reading:** the drawdown cut generalises. The return and Sharpe gain is mostly BTC-specific. If the owner adopts 12.5/5 on 10/24, the reason should be risk (a lower maxDD), not an expectation of higher return. The backtest return edge from Cycle 29 should be treated as partly path-luck. config.BEAR is unchanged. Guarded by tests/test_exit_cross_coin.py (5/5).

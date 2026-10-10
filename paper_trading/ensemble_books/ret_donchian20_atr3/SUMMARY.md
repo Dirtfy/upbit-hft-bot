@@ -1,10 +1,10 @@
 # SHADOW ensemble book `ret_donchian20_atr3` (official=false)
 
 공식 원장이 아님. 진화 탐색(research/evolution)에서 걸러진 후보를 동결해 forward로 굴리는 그림자 장부.
-- launched: 2026-10-04T04:00:00 UTC, as of 2026-10-09T12:00Z
+- launched: 2026-10-04T04:00:00 UTC, as of 2026-10-10T12:00Z
 - strategy: `donchian[tf=1d,n_in=20,n_out=20,atr_k=3] | gate=none vt=0 band=0.0 switch=0`
-- equity d0 (next-hour fill): 985,109 KRW (-1.49%)
-- equity d5 (5h blind window): 985,109 KRW (-1.49%)
+- equity d0 (next-hour fill): 978,276 KRW (-2.17%)
+- equity d5 (5h blind window): 978,276 KRW (-2.17%)
 - position now: BTC 100%
 - trades (d0): 1
 - replay check: OK (recompute == logged history)
