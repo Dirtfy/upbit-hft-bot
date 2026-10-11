@@ -94,14 +94,18 @@ def seeds():
 
 
 def evolve(L, s, e, rng, pop_n, gens, trials, log=print, tag=""):
-    """(mu+lambda) GA. Returns sorted [(fitness, genome, res)] of unique genomes."""
+    """(mu+lambda) GA. Returns sorted [(fitness, genome, res)] of unique genomes;
+    res = {delay: slim metrics} (no rets/eq series)."""
     seen = {}
 
     def score(g):
         k = lab.key(g)
         if k not in seen:
             f, res = fitness(L, g, s, e)
-            seen[k] = (f, g, res)
+            # scalars only: full rets/eq series are ~0.6 MB per genome and the
+            # final search keeps ~700 of them (Cycle 38: MemoryError under the
+            # 1 GB cap). Callers needing a series re-evaluate (deterministic).
+            seen[k] = (f, g, {d: slim(r) for d, r in res.items()})
             trials.add(k)
         return seen[k][0]
 
@@ -241,7 +245,8 @@ def main():
     cands = []
     for rank, (f, g, res) in enumerate(picks, 1):
         ho = {d: L_f.evaluate(g, h0, h1, delay=d) for d in DELAYS}
-        dsr = lab.deflated_sharpe(res[0]["sharpe"], res[0]["rets"], len(trials) + prior_trials, sr_var)
+        rets0 = L_s.evaluate(g, t0, hs, delay=0)["rets"]
+        dsr = lab.deflated_sharpe(res[0]["sharpe"], rets0, len(trials) + prior_trials, sr_var)
         c = {"rank": rank, "fitness": round(f, 4), "genome": g, "key": lab.key(g),
              "desc": lab.describe(g),
              "is": {f"d{d}": slim(res[d]) for d in DELAYS},

@@ -28,7 +28,7 @@ EVERY_DAYS="${EVOLVE_EVERY_DAYS:-7}"
 # hurt the server). A busy host just DEFERS the run to a later 4h tick.
 MIN_MEM_MB="${EVOLVE_MIN_MEM_MB:-400}"      # MemAvailable needed to start
 MAX_LOAD="${EVOLVE_MAX_LOAD:-$(nproc)}"     # 1-min loadavg ceiling to start
-VMEM_KB="${EVOLVE_VMEM_KB:-1048576}"        # hard address-space cap (1 GB; peak RSS ~70 MB)
+VMEM_KB="${EVOLVE_VMEM_KB:-1048576}"        # hard address-space cap (1 GB; final-search peak RSS ~55 MB since Cycle 38)
 mkdir -p logs
 
 host_busy() {  # prints a reason and returns 0 when the host is too busy

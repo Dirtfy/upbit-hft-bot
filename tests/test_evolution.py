@@ -117,6 +117,15 @@ try:
     r = L.evaluate(lab.fixed_genome("hold", {}, gate="dd20_10"), 0, mk.n)
     check("gated hold is flat during regime warmup", r["trades"] <= 1 or r["exposure"] < 1)
 
+    # ---- Cycle 38: the GA keeps scalar metrics only (MemoryError under the 1 GB cap)
+    import evolve as evo  # noqa: E402
+    ranked = evo.evolve(L, 0, mk.n, random.Random(4), 8, 2, set(), log=lambda m: None)
+    check("evolve() keeps no per-genome rets/eq series",
+          all("rets" not in r and "eq" not in r for _, _, res in ranked for r in res.values()))
+    f, g, res = ranked[0]
+    check("re-evaluating a pick reproduces its stored metrics (deterministic)",
+          evo.slim(L.evaluate(g, 0, mk.n, delay=0)) == res[0])
+
     # ---- deflated Sharpe: more trials -> lower probability
     rets = [random.Random(5).gauss(0.001, 0.02) for _ in range(1500)]
     d10 = lab.deflated_sharpe(1.0, rets, 10, 0.25)
