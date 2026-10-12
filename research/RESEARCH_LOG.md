@@ -1417,3 +1417,25 @@ Results on the 5 non-BTC coins:
 The first weekly re-run (10-11 04:01Z) and its retries at 08:01Z and 12:01Z all died in the FINAL search with `MemoryError`. All three crashed before the holdout step, so no holdout look was used and history.jsonl is unchanged. Cause: `evolve()` kept each unique genome's full result in `seen`, including the daily `rets`/`eq` series for both fills, about 0.6 MB per genome. The final search tries about 700 genomes, so it needed 400+ MB, plus fragmentation. Under the 1 GB address-space cap from Cycle 34 that failed. The comment "peak RSS ~70 MB" had been measured on a small run. The 10-04 run had no cap and tried fewer genomes.
 
 Fix: `seen` now keeps scalar metrics only (`slim`). The one consumer that needs a series is the DSR of the 3 frozen picks, and it re-evaluates that pick (evaluation is deterministic). Check: a FINAL-sized search (pop 40 × 20 gens, 719 genomes) run under `ulimit -v 1 GB` peaks at 54 MB RSS in 58 s. Re-evaluation reproduces the stored Sharpe exactly. Selection logic, fitness, the holdout rule and the books are unchanged. tests/test_evolution.py passes 29/29, with 2 new checks: no series are kept, and re-evaluation equals the stored metrics. The next 4h tick will re-run the weekly GA by itself.
+
+## Cycle 39 (2026-10-12): 4h stress test of the 12.5/5 exit candidate. PROPOSAL, config unchanged
+Also: the weekly GA re-ran cleanly after the Cycle 38 fix (10-11 16:01Z, rc=0, 3,512 configs, 200 s). 0 of 3 candidates survived the holdout: in-sample Sharpe 1.95–2.06 vs holdout d5 Sharpe −0.17 to −0.62. Nothing was promoted, and holdout looks now total 3. The crashed runs did not use one. Same verdict as Cycle 31.
+
+`backtest/exit_4h_stress.py` replays both configs on the KRW-BTC 4h path (2017-09 → 2026-09). The 00:00 UTC 4h bar opens with the daily candle, so fill +0h must equal the daily backtest, and it does exactly. A test checks that too.
+
+| test | live 20/10 CAGR / maxDD (4h marks) | 12.5/5 CAGR / maxDD (4h marks) |
+|---|---|---|
+| fill +0h (backtest) | 22.4% / 47.6% | 28.9% / 29.7% |
+| fill +4h | 21.6% / 48.2% | 28.5% / 31.9% |
+| fill +8h | 19.6% / 51.6% | 28.2% / 31.9% |
+| fill +12h | 22.1% / 48.5% | 27.9% / 30.8% |
+| fill +16h | 23.2% / 49.9% | 26.2% / 31.1% |
+| fill +20h | 24.8% / 48.3% | 25.8% / 32.1% |
+| 4h-checked breaker | 20.4% / 48.1% (20 trades) | 26.3% / 41.9% (15 trades) |
+
+What it shows:
+- **Fill timing:** 12.5/5 beats live on both CAGR and maxDD at every fill hour, so the edge is not a fill-time artefact. The CAGR margin narrows to +1 point at +20h. The maxDD margin stays at 16–20 points.
+- **Intraday marks:** they add only about 1 point to maxDD for either config.
+- **4h-checked breaker:** checking the rule intraday makes 12.5/5 worse (maxDD 28.5% → 38.4% on daily marks, more trades) through whipsaw. Keep the decision on the daily close.
+
+**Reading:** the candidate holds up as a daily-close rule filled any time the next day. Together with Cycle 37 (the maxDD cut generalises across coins), the case for 12.5/5 on 10/24 is a robust drawdown reduction. Its return edge is real on BTC but should not be counted on. tests/test_exit_4h_stress.py passes 5/5.
