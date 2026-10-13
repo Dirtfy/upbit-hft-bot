@@ -81,10 +81,10 @@ def _regime_reason(close, sl, dd, p, regime):
         if sl is not None and close < sl:
             trigger = "종가<200일선"
         if dd >= p["dd_enter"]:
-            trigger = (trigger + " 및 " if trigger else "") + "낙폭≥20%"
+            trigger = (trigger + " 및 " if trigger else "") + f"낙폭≥{p['dd_enter'] * 100:g}%"
         trigger = trigger or "약세 지속(히스테리시스)"
     elif regime == "bull":
-        trigger = "종가>200일선 그리고 낙폭 회복(≤10%)"
+        trigger = f"종가>200일선 그리고 낙폭 회복(≤{p['dd_exit'] * 100:g}%)"
     return "; ".join(bits), trigger
 
 
@@ -196,6 +196,8 @@ def process(mode):
             "cum_return_pct": round(100.0 * cum_pnl / START_CAPITAL, 4),
             "realized_cum_krw": round(realized_cum, 2),
             "reason": f"regime={regime} ({reason}); {act_reason}",
+            # which breaker made this decision (audit trail across a rule switch)
+            "params": {"dd_enter": p["dd_enter"], "dd_exit": p["dd_exit"]},
         }
         _append_jsonl(rec)
         _append_journal(rec)

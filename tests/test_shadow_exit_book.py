@@ -108,6 +108,18 @@ check("a close mismatch between the books is flagged",
 check("shadow journal is labelled as not official",
       "공식 원장이 아님" in open(sb.PATHS["JOURNAL_PATH"]).read())
 
+# ---- Cycle 40: labels follow the rule that made each record (10/24 switch-safe)
+check("official records carry their breaker params (20/10 today)",
+      all(r["params"] == {"dd_enter": 0.20, "dd_exit": 0.10} for r in off))
+sj = open(sb.PATHS["JOURNAL_PATH"]).read()
+check("shadow journal trigger text uses its own 12.5%/5% (no string patch)",
+      ("낙폭≥12.5%" in sj or "(≤5%)" in sj) and "낙폭≥20%" not in sj)
+legacy = [{k: v for k, v in r.items() if k != "params"} for r in off]
+switched = off[:-1] + [dict(off[-1], params={"dd_enter": 0.125, "dd_exit": 0.05})]
+check("headline label: legacy records = 20/10, a switched ledger shows its new rule",
+      cmp.headline(legacy, sh).startswith("official(20/10)")
+      and cmp.headline(switched, sh).startswith("official(12.5/5)"))
+
 check("real official ledger files byte-identical",
       before == [open(p, "rb").read() if os.path.exists(p) else None for p in REAL])
 

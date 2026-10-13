@@ -18,9 +18,12 @@ Usage: python3 paper_trading/period_report.py
 """
 import json
 import os
+import sys
 from datetime import date, datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "src"))
+from regime import dd_label  # noqa: E402
 OUT = os.path.join(HERE, "PERIOD_REPORT.md")
 CAPITAL = 1_000_000.0
 COST = 0.001                      # fee 0.05% + slippage 0.05%, entry side
@@ -50,6 +53,12 @@ def stats(name, official, days, equity, trades, note=""):
     return {"name": name, "official": official, "days": len(days), "first": days[0],
             "last": days[-1], "equity": equity[-1], "ret": equity[-1] / CAPITAL - 1,
             "mdd": _mdd([CAPITAL] + equity), "trades": trades, "note": note}
+
+
+def _ledger_label(path):
+    """Breaker label of the ledger's latest record (records carry `params`)."""
+    recs = _jsonl(path)
+    return dd_label(recs[-1].get("params") if recs else None)
 
 
 def daily_book(name, path, official):
@@ -149,9 +158,10 @@ def divergences(off, sh):
 
 def build(now=None):
     now = now or datetime.now(timezone.utc)
-    off, off_recs = daily_book("official long_flat dd 20%/10%", os.path.join(HERE, "paper_log.jsonl"), True)
-    sh, sh_recs = daily_book("shadow exit dd 12.5%/5%",
-                             os.path.join(HERE, "shadow_exit_book", "paper_log.jsonl"), False)
+    off_path = os.path.join(HERE, "paper_log.jsonl")
+    sh_path = os.path.join(HERE, "shadow_exit_book", "paper_log.jsonl")
+    off, off_recs = daily_book(f"official long_flat dd {_ledger_label(off_path)}", off_path, True)
+    sh, sh_recs = daily_book(f"shadow exit dd {_ledger_label(sh_path)}", sh_path, False)
     rows = [off, sh]
     eb = os.path.join(HERE, "ensemble_books")
     if os.path.isdir(eb):
@@ -186,11 +196,9 @@ def build(now=None):
           "Use this as an operations check, not as proof of edge.",
           "- Max DD is measured on end-of-day equity from the 1,000,000 KRW start.", ""]
     try:
-        import sys
-        sys.path.insert(0, os.path.join(os.path.dirname(HERE), "src"))
         import config
-        L += reentry_outlook([("official 20%/10%", config.BEAR),
-                              ("shadow 12.5%/5%", dict(config.BEAR, dd_enter=0.125, dd_exit=0.05))])
+        L += reentry_outlook([(f"official {dd_label(config.BEAR)}", config.BEAR),
+                              (f"shadow {_ledger_label(sh_path)}", dict(config.BEAR, dd_enter=0.125, dd_exit=0.05))])
     except Exception as e:  # the outlook is informational; never fail the report
         L.append(f"Re-entry outlook unavailable: {e!r}")
     with open(OUT, "w") as f:

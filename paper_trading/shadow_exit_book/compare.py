@@ -9,9 +9,12 @@ Usage:  python3 paper_trading/shadow_exit_book/compare.py   (prints the headline
 """
 import json
 import os
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PT = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(PT), "src"))
+from regime import dd_label  # noqa: E402
 OFFICIAL = os.path.join(PT, "paper_log.jsonl")
 SHADOW = os.path.join(HERE, "paper_log.jsonl")
 OUT = os.path.join(HERE, "COMPARE.md")
@@ -64,8 +67,9 @@ def headline(off=None, sh=None):
         return "shadow book: no records yet"
     div = [r for r in rows if r["diverged"]]
     mm = sum(r["data_mismatch"] for r in rows)
-    return (f"official(20/10) {a['pos']} {a['equity']:,.0f} KRW {a['ret']:+.2f}% | "
-            f"shadow(12.5/5) {b['pos']} {b['equity']:,.0f} KRW {b['ret']:+.2f}% | "
+    lo, ls = (dd_label(r[-1].get("params")).replace("%", "") for r in (off, sh))
+    return (f"official({lo}) {a['pos']} {a['equity']:,.0f} KRW {a['ret']:+.2f}% | "
+            f"shadow({ls}) {b['pos']} {b['equity']:,.0f} KRW {b['ret']:+.2f}% | "
             f"candle {b['candle']} | divergences {len(div)}"
             + (f" (last {div[-1]['t']})" if div else "")
             + (f" | DATA MISMATCH {mm}" if mm else ""))
@@ -81,10 +85,11 @@ def write(off=None, sh=None, out=None):
     mm = [r["t"] for r in rows if r["data_mismatch"]]
     L = ["# 공식 vs SHADOW 비교 — 자동 생성 (`compare.py`)\n",
          "*SHADOW = 후보 청산속도 dd_enter 12.5% / dd_exit 5% (오너 option B, 2026-10-04). "
-         "공식 = 현행 20% / 10%. 데이터·수수료·체결·사이징·1M KRW 상한 동일. "
+         f"공식 = 현행 {dd_label(off[-1].get('params')).replace('/', ' / ')}. 데이터·수수료·체결·사이징·1M KRW 상한 동일. "
          "SHADOW는 공식 원장이 아니며 공식 기록에 영향 없음.*\n",
          f"헤드라인: `{headline(off, sh)}`\n",
-         "| 항목 | 공식 (20%/10%) | SHADOW (12.5%/5%) |", "|---|---|---|"]
+         f"| 항목 | 공식 ({dd_label(off[-1].get('params'))}) | SHADOW ({dd_label(sh[-1].get('params'))}) |",
+         "|---|---|---|"]
     for label, key, fmt in (("최종 봉", "candle", "{}"), ("포지션", "pos", "**{}**"),
                             ("장세", "regime", "{}"), ("평가액 KRW", "equity", "**{:,.0f}**"),
                             ("누적 수익률", "ret", "**{:+.2f}%**"),

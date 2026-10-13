@@ -1439,3 +1439,14 @@ What it shows:
 - **4h-checked breaker:** checking the rule intraday makes 12.5/5 worse (maxDD 28.5% → 38.4% on daily marks, more trades) through whipsaw. Keep the decision on the daily close.
 
 **Reading:** the candidate holds up as a daily-close rule filled any time the next day. Together with Cycle 37 (the maxDD cut generalises across coins), the case for 12.5/5 on 10/24 is a robust drawdown reduction. Its return edge is real on BTC but should not be counted on. tests/test_exit_4h_stress.py passes 5/5.
+
+## Cycle 40 (2026-10-13): switch-safety for the 10/24 decision (ops, no rule change)
+Pre-flight question: if the owner approves 12.5/5, what breaks? Eleven places hardcoded "20%/10%". The official ledger did not record which rule made each decision, and the shadow book string-patched paper_trader's trigger text. After a switch, the official book would have been labelled 20/10 while trading 12.5/5.
+
+Changes:
+- Every official record now carries `params` (dd_enter/dd_exit). Records without it are 20/10.
+- `regime.dd_label()` is the single source of the labels in the COMPARE.md headline and table, the ensemble COMPARE, and PERIOD_REPORT. Each label comes from that ledger's own latest record.
+- paper_trader's trigger text is formatted from the active params. The shadow's string patch is removed.
+- `paper_trading/SWITCH_RUNBOOK.md` lists the exact steps for a switch: 2 config values plus 4 test guards. It also covers what stays the same and the owner's choice for the shadow book after a switch.
+
+Check: the regenerated COMPARE.md and PERIOD_REPORT.md are byte-identical to before, apart from timestamps. tests/test_shadow_exit_book.py passes 15/15 with 3 new checks: official params are stamped, the shadow trigger text is its own, and the label follows a switched ledger. All 13 test files pass. config.BEAR is unchanged.

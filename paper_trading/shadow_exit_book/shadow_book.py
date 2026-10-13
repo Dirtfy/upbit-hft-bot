@@ -62,21 +62,10 @@ def _journal_header():
     )
 
 
-def _regime_reason(close, sl, dd, p, regime):
-    reason, trigger = _orig_reason(close, sl, dd, p, regime)
-    trigger = (trigger.replace("낙폭≥20%", f"낙폭≥{p['dd_enter']:.1%}")
-               .replace("(≤10%)", f"(≤{p['dd_exit']:.0%})"))
-    return reason, trigger
-
-
-_orig_reason = pt._regime_reason
-
-
 @contextlib.contextmanager
 def shadow_patches(backfill=False):
     """Point paper_trader at this book for the duration, then restore."""
-    saved = {k: getattr(pt, k) for k in list(PATHS) + ["_journal_header", "_regime_reason",
-                                                      "_append_jsonl"]}
+    saved = {k: getattr(pt, k) for k in list(PATHS) + ["_journal_header", "_append_jsonl"]}
     saved_bear = config.BEAR
     orig_append = pt._append_jsonl
 
@@ -90,7 +79,6 @@ def shadow_patches(backfill=False):
         for k, v in PATHS.items():
             setattr(pt, k, v)
         pt._journal_header = _journal_header
-        pt._regime_reason = _regime_reason
         pt._append_jsonl = append
         config.BEAR = dict(saved_bear, **OVERRIDE)
         yield

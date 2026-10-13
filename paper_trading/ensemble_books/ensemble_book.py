@@ -208,8 +208,9 @@ def write_compare(statuses):
          f"Generated {datetime.now(timezone.utc):%Y-%m-%dT%H:%MZ} by ensemble_book.py. "
          "Only the first row is the OFFICIAL book; everything else is official=false.", "",
          "| book | official | equity KRW | return | position | as of |", "|---|---|---|---|---|---|"]
-    for name, rec, flag in (("official long_flat dd 20%/10%", off, "**true**"),
-                            ("shadow exit dd 12.5%/5%", sh, "false")):
+    from regime import dd_label
+    for name, rec, flag in ((f"official long_flat dd {dd_label(off and off.get('params'))}", off, "**true**"),
+                            (f"shadow exit dd {dd_label(sh and sh.get('params'))}", sh, "false")):
         if rec:
             L.append(f"| {name} | {flag} | {rec['equity_krw']:,.0f} | {rec['cum_return_pct']:+.2f}% | "
                      f"{rec['position_after']} | candle {rec['candle_t'][:10]} |")

@@ -56,6 +56,14 @@ def compute_regimes(bars, p):
     return out
 
 
+def dd_label(p):
+    """'20%/10%' style label of a param dict's drawdown breaker (dd_enter/dd_exit).
+    A dict without them (official ledger records before Cycle 40) = the rule that
+    produced them, 20%/10%."""
+    de, dx = (p or {}).get("dd_enter", 0.20), (p or {}).get("dd_exit", 0.10)
+    return f"{de * 100:g}%/{dx * 100:g}%"
+
+
 def current_regime(bars, p):
     """Regime of the most recent (closed) bar — what the live engine acts on."""
     r = compute_regimes(bars, p)
