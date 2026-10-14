@@ -1450,3 +1450,23 @@ Changes:
 - `paper_trading/SWITCH_RUNBOOK.md` lists the exact steps for a switch: 2 config values plus 4 test guards. It also covers what stays the same and the owner's choice for the shadow book after a switch.
 
 Check: the regenerated COMPARE.md and PERIOD_REPORT.md are byte-identical to before, apart from timestamps. tests/test_shadow_exit_book.py passes 15/15 with 3 new checks: official params are stamped, the shadow trigger text is its own, and the label follows a switched ledger. All 13 test files pass. config.BEAR is unchanged.
+
+## Cycle 41 (2026-10-14): operational-integrity section in PERIOD_REPORT
+The 10/24 decision rests on the backtest evidence plus operational soundness, so soundness should be shown, not just asserted. PERIOD_REPORT.md now has a read-only "Operational integrity" table covering:
+- candle coverage of both daily ledgers (duplicates, gaps, late records);
+- whether both books saw the same data;
+- gaps in the 4h trail;
+- daemon outages inside the period. The 6 outage-ledger entries that the ledger itself flags as Cycle 27 false positives are excluded, and downtime is shown as an upper bound.
+
+Period to date (day 20):
+- both ledgers: 20/20 candles, 0 duplicates, 0 gaps;
+- 0 close mismatches;
+- 4h trail: 123 candles, 0 gaps;
+- outages: 10 real, the last on 10-04. The downtime upper bound of ~32 h is mostly two pre-heartbeat reconstructions. No decision was missed.
+
+Late records:
+- official: 4. Three are the hand-run days before the daemon (09-24..26). The fourth is 10-03, delayed by the 10-04 00:31Z DNS failure and logged 03:24Z.
+- shadow: 1 (10-03); its launch backfill is excluded.
+- Every decision used the closed candle.
+
+tests/test_period_report.py passes 14/14 with 5 new checks on a synthetic gap, duplicate, mismatch and false positive. Ledgers stay byte-identical.

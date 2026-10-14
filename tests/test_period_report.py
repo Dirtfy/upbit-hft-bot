@@ -58,6 +58,33 @@ try:
     md = open(pr.OUT).read()
     check("report has the re-entry outlook", "Re-entry outlook" in md)
     check("report states interim vs final", ("interim" in md) != ("PERIOD COMPLETE" in md))
+    # ---- Cycle 41: operational-integrity section
+    import tempfile
+    def rec(d, close=100.0, logged=None):
+        return {"candle_t": f"{d}T00:00:00", "close": close,
+                "logged_at_utc": logged or f"{d[:8]}{int(d[8:]) + 1:02d}T00:05:00+00:00"}
+    off_s = [rec("2026-10-01"), rec("2026-10-02"), rec("2026-10-02"), rec("2026-10-05")]
+    sh_s = [rec("2026-10-01"), rec("2026-10-02", close=99.0),
+            dict(rec("2026-10-05", logged="2026-10-09T00:00:00+00:00"), backfilled_at_launch=True)]
+    tmpd = tempfile.mkdtemp()
+    olog = os.path.join(tmpd, "outages.log")
+    open(olog, "w").write(
+        "2026-10-01T10:40:02Z paper UNCLEAN_EXIT pid=1 last_heartbeat=x down_at_most=210s (~3min)\n"
+        "# NOTE: a comment line\n"
+        "2026-10-04T03:30:02Z collect_4h UNCLEAN_EXIT owner=h/1:2 last_heartbeat=x down_at_most=720s (~12min)\n"
+        "2026-09-01T00:00:00Z paper UNCLEAN_EXIT pid=3 last_heartbeat=x down_at_most=9999s\n")
+    h4 = os.path.join(tmpd, "h4.csv")
+    open(h4, "w").write("time_utc,close\n2026-10-01T00:00:00,1\n2026-10-01T04:00:00,1\n2026-10-01T12:00:00,1\n")
+    txt = "\n".join(pr.integrity(off_s, sh_s, olog, h4))
+    check("integrity: duplicate and gap in the official ledger are reported",
+          "4 candles, 1 duplicates, 1 gaps (2026-10-02..2026-10-05)" in txt)
+    check("integrity: close mismatch between books is reported", "1 close mismatches (2026-10-02)" in txt)
+    check("integrity: launch backfill is not 'late'; 4h gap counted",
+          "3 candles, 0 duplicates, 1 gaps (2026-10-02..2026-10-05) | 0 late" in txt
+          and "3 candles in period, 1 gaps" in txt)
+    check("integrity: false positives and pre-period outages excluded, downtime is 12 min upper bound",
+          "1 real (last 2026-10-04), 1 logged false positives excluded; downtime upper bound ~0.2 h" in txt)
+    check("report has the integrity section", "## Operational integrity" in md)
 finally:
     if out_before is not None:
         open(pr.OUT, "wb").write(out_before)

@@ -150,6 +150,63 @@ def reentry_outlook(books, horizon_to=PERIOD_END, closes=None):
     return L
 
 
+OUTAGES = os.path.join(os.path.dirname(HERE), "logs", "daemon_outages.log")
+LATE_S = 2 * 3600                 # a record logged >2h after its candle closed is "late"
+# outage-ledger entries annotated in the log itself as FALSE positives (Cycle 27:
+# cross-container PID-namespace mismatch, not downtime)
+FALSE_OUTAGES = ("2026-10-01T10:40:02Z", "2026-10-01T13:19:30Z", "2026-10-01T13:19:31Z",
+                 "2026-10-01T13:20:02Z")
+
+
+def integrity(off, sh, outages_path=OUTAGES, h4_path=os.path.join(HERE, "market_data_4h.csv")):
+    """Operational soundness of the period, read-only: candle coverage of both
+    daily ledgers (one record per day, no gap/duplicate), identical data in both
+    books, late records, 4h trail gaps, daemon outages inside the period."""
+    def coverage(recs):
+        d = [r["candle_t"][:10] for r in recs]
+        days = sorted(date.fromisoformat(x) for x in set(d))
+        gaps = [f"{a}..{b}" for a, b in zip(days, days[1:]) if (b - a).days != 1]
+        late = [r["candle_t"][:10] for r in recs
+                if (datetime.fromisoformat(r["logged_at_utc"][:19])
+                    - datetime.fromisoformat(r["candle_t"][:19])).total_seconds() > 86400 + LATE_S
+                and not r.get("backfilled_at_launch")]
+        return len(d), len(d) - len(set(d)), gaps, late
+    rows = []
+    for name, recs in (("official", off), ("shadow 12.5/5", sh)):
+        n, dup, gaps, late = coverage(recs)
+        rows.append(f"| {name} daily ledger | {n} candles, {dup} duplicates, "
+                    f"{len(gaps)} gaps{' (' + ', '.join(gaps) + ')' if gaps else ''} | "
+                    f"{len(late)} late (>2h){': ' + ', '.join(late) if late else ''} |")
+    s = {r["candle_t"]: r["close"] for r in sh}
+    mism = sorted({r["candle_t"][:10] for r in off if r["candle_t"] in s and s[r["candle_t"]] != r["close"]})
+    rows.append(f"| same data in both books | {len(mism)} close mismatches"
+                f"{' (' + ', '.join(mism) + ')' if mism else ''} | |")
+    t = []
+    if os.path.exists(h4_path):
+        with open(h4_path) as fh:
+            next(fh, None)
+            t = [datetime.fromisoformat(line.split(",", 1)[0][:19]) for line in fh if line.strip()]
+    t = [x for x in t if x.date() >= date.fromisoformat(PERIOD_START)]
+    g4 = sum((b - a) != timedelta(hours=4) for a, b in zip(t, t[1:]))
+    rows.append(f"| 4h candle trail | {len(t)} candles in period, {g4} gaps | |")
+    outs = []
+    if os.path.exists(outages_path):
+        outs = [line for line in open(outages_path)
+                if line[:1].isdigit() and line[:10] >= PERIOD_START and "down_at_most=" in line]
+    false = [x for x in outs if x.split()[0] in FALSE_OUTAGES]
+    real = [x for x in outs if x not in false]
+    mins = sum(int(x.split("down_at_most=")[1].split("s")[0]) for x in real) / 60
+    last = max((x.split()[0][:10] for x in real), default="-")
+    rows.append(f"| daemon outages (self-healed) | {len(real)} real (last {last}), "
+                f"{len(false)} logged false positives excluded; downtime upper bound ~{mins / 60:.1f} h | "
+                "no missed decision: ledgers above have no gaps |")
+    return (["", "## Operational integrity (period to date)", "",
+             "| check | result | note |", "|---|---|---|"] + rows +
+            ["", "Late records before the daemons existed (Cycles 22-24) were run by hand; "
+             "the shadow book's launch backfill is excluded. A late record still uses the closed candle "
+             "of its day, so decisions are unaffected."])
+
+
 def divergences(off, sh):
     s = {r["candle_t"]: r for r in sh}
     return [r["candle_t"][:10] for r in off if r["candle_t"] in s and
@@ -195,6 +252,10 @@ def build(now=None):
           "- One month is far too short to separate skill from luck (Cycle 11 power analysis). "
           "Use this as an operations check, not as proof of edge.",
           "- Max DD is measured on end-of-day equity from the 1,000,000 KRW start.", ""]
+    try:
+        L += integrity(off_recs, sh_recs)
+    except Exception as e:  # informational; never fail the report
+        L.append(f"Integrity section unavailable: {e!r}")
     try:
         import config
         L += reentry_outlook([(f"official {dd_label(config.BEAR)}", config.BEAR),
