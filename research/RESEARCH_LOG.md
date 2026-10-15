@@ -1470,3 +1470,12 @@ Late records:
 - Every decision used the closed candle.
 
 tests/test_period_report.py passes 14/14 with 5 new checks on a synthetic gap, duplicate, mismatch and false positive. Ledgers stay byte-identical.
+
+## Cycle 42 (2026-10-15): PERIOD_REPORT freezes at the period end
+The daemons keep appending after 10/24, but period_report.py read every record. From 10-25 the report would have said "PERIOD COMPLETE: these are the final numbers" while the numbers kept moving with post-period days. Every input is now clipped to PERIOD_START..PERIOD_END:
+- the daily books, the ensemble books and the BTC benchmark;
+- divergences, integrity coverage, 4h gaps and outages.
+
+After the end, the report states how many later official candles it excluded and drops the re-entry outlook, whose horizon would be in the past. Output today is unchanged, since all records are in the period. tests/test_period_report.py passes 18/18 with 4 new checks: PERIOD_END is moved back to 10-05 on the real ledgers, and the books and benchmark stop there with the FINAL label. Ledgers stay byte-identical.
+
+Ops note: the Donchian book has been unchanged since 10-13 because it exited to cash that day; it is not stuck. Its d5 fill exited 1.8 points better than d0 (−2.25% vs −4.07%).

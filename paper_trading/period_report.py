@@ -31,6 +31,12 @@ PERIOD_START = "2026-09-24"       # first official candle
 PERIOD_END = "2026-10-24"         # planned verdict date (~1 month)
 
 
+def in_period(day):
+    """Only candles PERIOD_START..PERIOD_END count. The daemons keep appending
+    after the period ends; those days must not move the FINAL numbers."""
+    return PERIOD_START <= day[:10] <= PERIOD_END
+
+
 def _jsonl(path):
     if not os.path.exists(path):
         return []
@@ -62,7 +68,7 @@ def _ledger_label(path):
 
 
 def daily_book(name, path, official):
-    recs = _jsonl(path)
+    recs = [r for r in _jsonl(path) if in_period(r["candle_t"])]
     days = [r["candle_t"][:10] for r in recs]
     eq = [r["equity_krw"] for r in recs]
     trades = sum(1 for r in recs if r.get("action") in ("BUY", "SELL"))
@@ -71,7 +77,7 @@ def daily_book(name, path, official):
 
 
 def ensemble_book(path, name):
-    recs = _jsonl(path)
+    recs = [r for r in _jsonl(path) if in_period(r["day"])]
     return stats(name + " (d0)", False, [r["day"] for r in recs], [r["equity_d0_krw"] for r in recs],
                  sum(len(r["trades_d0"]) for r in recs),
                  "d5 equity %s KRW; launched 2026-10-04" % (
@@ -186,13 +192,13 @@ def integrity(off, sh, outages_path=OUTAGES, h4_path=os.path.join(HERE, "market_
         with open(h4_path) as fh:
             next(fh, None)
             t = [datetime.fromisoformat(line.split(",", 1)[0][:19]) for line in fh if line.strip()]
-    t = [x for x in t if x.date() >= date.fromisoformat(PERIOD_START)]
+    t = [x for x in t if in_period(x.isoformat())]
     g4 = sum((b - a) != timedelta(hours=4) for a, b in zip(t, t[1:]))
     rows.append(f"| 4h candle trail | {len(t)} candles in period, {g4} gaps | |")
     outs = []
     if os.path.exists(outages_path):
         outs = [line for line in open(outages_path)
-                if line[:1].isdigit() and line[:10] >= PERIOD_START and "down_at_most=" in line]
+                if line[:1].isdigit() and in_period(line) and "down_at_most=" in line]
     false = [x for x in outs if x.split()[0] in FALSE_OUTAGES]
     real = [x for x in outs if x not in false]
     mins = sum(int(x.split("down_at_most=")[1].split("s")[0]) for x in real) / 60
@@ -227,14 +233,17 @@ def build(now=None):
             if os.path.exists(p):
                 rows.append(ensemble_book(p, name))
     last = off.get("last", PERIOD_START)
-    rows.append(buy_and_hold(os.path.join(HERE, "market_data_daily.csv"), PERIOD_START, last))
+    rows.append(buy_and_hold(os.path.join(HERE, "market_data_daily.csv"), PERIOD_START, min(last, PERIOD_END)))
+    post = sum(1 for r in _jsonl(off_path) if r["candle_t"][:10] > PERIOD_END)
     div = divergences(off_recs, sh_recs)
 
     done = last >= PERIOD_END
     L = ["# Paper period report (all books)", "",
          f"Generated {now:%Y-%m-%dT%H:%MZ} by period_report.py (read-only, deterministic).",
          f"Period: {PERIOD_START} .. {PERIOD_END} (planned). Latest official candle: {last}. "
-         + ("**PERIOD COMPLETE: these are the final numbers.**" if done else
+         + ("**PERIOD COMPLETE: these are the final numbers.**"
+            + (f" {post} later official candle(s) are excluded; the books keep running "
+               "(see each book's SUMMARY.md)." if post else "") if done else
             f"In progress: day {off.get('days', 0)} of ~31; numbers are interim."), "",
          "| book | official | days | first..last | equity KRW | return | max DD | trades | note |",
          "|---|---|---|---|---|---|---|---|---|"]
@@ -258,8 +267,10 @@ def build(now=None):
         L.append(f"Integrity section unavailable: {e!r}")
     try:
         import config
-        L += reentry_outlook([(f"official {dd_label(config.BEAR)}", config.BEAR),
-                              (f"shadow {_ledger_label(sh_path)}", dict(config.BEAR, dd_enter=0.125, dd_exit=0.05))])
+        if not done:  # after the period the outlook's horizon is in the past
+            L += reentry_outlook([(f"official {dd_label(config.BEAR)}", config.BEAR),
+                                  (f"shadow {_ledger_label(sh_path)}",
+                                   dict(config.BEAR, dd_enter=0.125, dd_exit=0.05))])
     except Exception as e:  # the outlook is informational; never fail the report
         L.append(f"Re-entry outlook unavailable: {e!r}")
     with open(OUT, "w") as f:

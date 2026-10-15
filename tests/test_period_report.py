@@ -85,6 +85,25 @@ try:
     check("integrity: false positives and pre-period outages excluded, downtime is 12 min upper bound",
           "1 real (last 2026-10-04), 1 logged false positives excluded; downtime upper bound ~0.2 h" in txt)
     check("report has the integrity section", "## Operational integrity" in md)
+    # ---- Cycle 42: after the period, FINAL numbers are frozen at PERIOD_END
+    real_end = pr.PERIOD_END
+    try:
+        pr.PERIOD_END = "2026-10-05"          # pretend the period ended on day 12
+        rows_f, div_f = pr.build()
+        md_f = open(pr.OUT).read()
+        off12 = [r for r in off if r["candle_t"][:10] <= "2026-10-05"]
+        bh = rows_f[-1]
+        check("after the end: books stop at PERIOD_END (days, equity = that day's)",
+              rows_f[0]["days"] == len(off12) and rows_f[0]["last"] == "2026-10-05"
+              and rows_f[0]["equity"] == off12[-1]["equity_krw"]
+              and all(r.get("last", "") <= "2026-10-05" for r in rows_f))
+        check("after the end: benchmark stops at PERIOD_END too", bh["last"] == "2026-10-05")
+        check("after the end: FINAL label, excluded days stated, no stale outlook",
+              "PERIOD COMPLETE" in md_f and f"{len(off) - len(off12)} later official candle(s) are excluded" in md_f
+              and "Re-entry outlook" not in md_f)
+        check("after the end: ledgers still byte-identical", before == [open(p, "rb").read() for p in ledgers])
+    finally:
+        pr.PERIOD_END = real_end
 finally:
     if out_before is not None:
         open(pr.OUT, "wb").write(out_before)
