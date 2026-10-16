@@ -1479,3 +1479,15 @@ The daemons keep appending after 10/24, but period_report.py read every record. 
 After the end, the report states how many later official candles it excluded and drops the re-entry outlook, whose horizon would be in the past. Output today is unchanged, since all records are in the period. tests/test_period_report.py passes 18/18 with 4 new checks: PERIOD_END is moved back to 10-05 on the real ledgers, and the books and benchmark stop there with the FINAL label. Ledgers stay byte-identical.
 
 Ops note: the Donchian book has been unchanged since 10-13 because it exited to cash that day; it is not stuck. Its d5 fill exited 1.8 points better than d0 (−2.25% vs −4.07%).
+
+## Cycle 43 (2026-10-16): 10/24 decision brief drafted; evidence re-run on current data
+`paper_trading/DECISION_BRIEF_1024.md` is the decision document for the owner, in Korean. It covers:
+- the two questions: the rule, and what to do with the shadow book if switching;
+- the recommendation: C, justified by the drawdown cut and not by return;
+- an evidence table from Cycles 29, 37 and 39, and the costs of C;
+- what the forward period can and cannot show;
+- the case for A, and the switch steps.
+
+Before writing it, I re-ran exit_sweep, exit_cross_coin (data now to 10-15) and exit_4h_stress. Every figure cited matches the logged results to 0.1 points, so the brief cites reproducible numbers. The final forward figures will come from PERIOD_REPORT (FINAL) after the 10-25 00:05 UTC tick.
+
+Ops: the "WARN replay drift 128 KRW" lines in collect_4h_daemon.log are all from 10-06 and were fixed in Cycle 33. None have appeared since.

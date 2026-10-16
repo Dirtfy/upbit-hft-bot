@@ -1,13 +1,13 @@
 # All paper books side by side
 
-Generated 2026-10-15T12:01Z by ensemble_book.py. Only the first row is the OFFICIAL book; everything else is official=false.
+Generated 2026-10-16T12:01Z by ensemble_book.py. Only the first row is the OFFICIAL book; everything else is official=false.
 
 | book | official | equity KRW | return | position | as of |
 |---|---|---|---|---|---|
-| official long_flat dd 20%/10% | **true** | 1,000,000 | +0.00% | FLAT | candle 2026-10-14 |
-| shadow exit dd 12.5%/5% | false | 1,000,000 | +0.00% | FLAT | candle 2026-10-14 |
-| ret_donchian20_atr3 (d0 / d5) | false | 959,323 / 977,496 | -4.07% / -2.25% | FLAT (cash) | 2026-10-15T12:00Z |
-| ctrl_evo_cand3_failed_oos (d0 / d5) | false | 979,582 / 979,205 | -2.04% / -2.08% | BTC 16% | 2026-10-15T12:00Z |
+| official long_flat dd 20%/10% | **true** | 1,000,000 | +0.00% | FLAT | candle 2026-10-15 |
+| shadow exit dd 12.5%/5% | false | 1,000,000 | +0.00% | FLAT | candle 2026-10-15 |
+| ret_donchian20_atr3 (d0 / d5) | false | 959,323 / 977,496 | -4.07% / -2.25% | FLAT (cash) | 2026-10-16T12:00Z |
+| ctrl_evo_cand3_failed_oos (d0 / d5) | false | 981,883 / 981,498 | -1.81% / -1.85% | BTC 17% | 2026-10-16T12:00Z |
 
 Ensemble books start at their own launch time (not 2026-09-24), so compare returns over the same dates only from the ensemble launch onward.
 
