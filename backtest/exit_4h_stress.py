@@ -19,7 +19,7 @@ UTC 4h bar opens with the Upbit daily candle) under three stresses:
 
 The candidate passes if it keeps beating live on CAGR and maxDD for every fill
 hour, and under the 4h-checked breaker. Same fee as the engine. Does NOT change
-config.
+config. The baseline is pinned to 20/10, so the comparison survives a switch.
 Usage: python3 backtest/exit_4h_stress.py [--daily data/krw_btc_1d.csv] [--h4 data/krw_btc_4h_full.csv]
 """
 import argparse
@@ -36,7 +36,7 @@ import bear_strategy as bs                        # noqa: E402
 from bear_backtest import load, metrics, max_drawdown  # noqa: E402
 
 FMT = "%Y-%m-%dT%H:%M:%S"
-CONFIGS = {"live 20/10": (config.BEAR["dd_enter"], config.BEAR["dd_exit"]),
+CONFIGS = {"base 20/10": (0.20, 0.10),           # Cycle 29 reference, pinned (not config.BEAR)
            "cand 12.5/5": (0.125, 0.05)}
 FEE = bs.FEE
 
@@ -140,7 +140,7 @@ def verdict(rows):
     by = {(r["cfg"], r["test"]): r for r in rows}
     out = []
     for t in dict.fromkeys(r["test"] for r in rows):
-        lv, cd = by[("live 20/10", t)], by[("cand 12.5/5", t)]
+        lv, cd = by[("base 20/10", t)], by[("cand 12.5/5", t)]
         out.append((t, cd["cagr"] > lv["cagr"], cd["mdd_4h"] < lv["mdd_4h"]))
     return out
 
@@ -161,7 +161,7 @@ def main():
     for r in rows:
         print(f"{r['cfg']:<13}{r['test']:<12}{r['cagr'] * 100:>7.1f}{r['sharpe']:>7.2f}{r['trades']:>5}"
               f"{r['mdd'] * 100:>11.1f}{r['mdd_4h'] * 100:>10.1f}")
-    print("\ncandidate vs live:")
+    print("\ncandidate vs base:")
     for t, c, d in verdict(rows):
         print(f"  {t:<11} CAGR {'better' if c else 'WORSE'}, 4h maxDD {'better' if d else 'WORSE'}")
     return rows

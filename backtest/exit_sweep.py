@@ -34,6 +34,8 @@ from band_sweep import yearly                     # noqa: E402
 
 DD_ENTER = (0.10, 0.125, 0.15, 0.175, 0.20, 0.25)
 DD_EXIT = (0.05, 0.10)
+BASELINE = (0.20, 0.10)                           # the Cycle 29 reference rule; pinned so the
+                                                 # evidence reproduces after a config switch
 SPLIT = "2022-01-01"                              # first / second half boundary
 
 
@@ -43,7 +45,7 @@ def half(bars, eq, first):
     return seg[-1] / seg[0] - 1, max_drawdown(seg)
 
 
-def sweep(bars, dd_enter=DD_ENTER, dd_exit=DD_EXIT, capital=1_000_000.0):
+def sweep(bars, dd_enter=DD_ENTER, dd_exit=DD_EXIT, capital=1_000_000.0, baseline=BASELINE):
     live = (config.BEAR["dd_enter"], config.BEAR["dd_exit"])
     res = []
     for de in dd_enter:
@@ -54,16 +56,18 @@ def sweep(bars, dd_enter=DD_ENTER, dd_exit=DD_EXIT, capital=1_000_000.0):
             eq, held, trades = bs.replay(bars, p, "long_flat", capital)
             m = metrics(f"enter={de:.1%} exit={dx:.0%}", eq, held, trades, bars)
             (r1, d1), (r2, d2) = half(bars, eq, True), half(bars, eq, False)
-            m.update(dd_enter=de, dd_exit=dx, live=(de, dx) == live,
+            m.update(dd_enter=de, dd_exit=dx, live=(de, dx) == live, base=(de, dx) == baseline,
                      years=yearly(bars, eq), h1_ret=r1, h1_mdd=d1, h2_ret=r2, h2_mdd=d2,
                      bears={w: window_return(bars, eq, s, e) for w, s, e in BEAR_WINDOWS})
             res.append(m)
-    base = next(r for r in res if r["live"])
+    base = next((r for r in res if r["base"]), None)
+    if base is None:
+        raise ValueError(f"baseline {baseline} is not in the sweep grid")
     for r in res:
         r["years_beat_base"] = sum(1 for y, v in r["years"].items() if v > base["years"][y] + 1e-9)
         r["years_lose_base"] = sum(1 for y, v in r["years"].items() if v < base["years"][y] - 1e-9)
         # robust = no worse on return AND drawdown in BOTH halves, bear defence intact
-        r["robust"] = (not r["live"]
+        r["robust"] = (not r["base"]
                        and r["h1_ret"] >= base["h1_ret"] - 1e-9 and r["h2_ret"] >= base["h2_ret"] - 1e-9
                        and r["h1_mdd"] <= base["h1_mdd"] + 1e-9 and r["h2_mdd"] <= base["h2_mdd"] + 1e-9
                        and all((r["bears"][w] or 0) >= (base["bears"][w] or 0) - 1e-9
@@ -84,13 +88,14 @@ def main():
           f"{'H1ret%':>8}{'H1dd%':>7}{'H2ret%':>8}{'H2dd%':>7}{'yrs+':>5}{'yrs-':>5}"
           + "".join(f"{w[:10]:>12}" for w, _, _ in BEAR_WINDOWS) + "  note")
     for r in res:
-        note = "LIVE" if r["live"] else ("robust" if r["robust"] else "")
+        note = " ".join(n for n, on in (("BASE", r["base"]), ("LIVE", r["live"]),
+                                         ("robust", r["robust"])) if on)
         print(f"{r['dd_enter']:>6.1%}{r['dd_exit']:>5.0%}{r['cagr']*100:>7.1f}{r['mdd']*100:>7.1f}"
               f"{r['sharpe']:>6.2f}{r['trades']:>5}{r['h1_ret']*100:>8.0f}{r['h1_mdd']*100:>7.1f}"
               f"{r['h2_ret']*100:>8.0f}{r['h2_mdd']*100:>7.1f}{r['years_beat_base']:>5}"
               f"{r['years_lose_base']:>5}"
               + "".join(f"{(v or 0)*100:>11.1f}%" for v in r["bears"].values()) + f"  {note}")
-    print(f"\nrobust improvements over LIVE: {sum(r['robust'] for r in res)}")
+    print(f"\nrobust improvements over BASE {BASELINE[0]:.0%}/{BASELINE[1]:.0%}: {sum(r['robust'] for r in res)}")
     return res
 
 

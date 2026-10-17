@@ -7,12 +7,18 @@ without the owner's explicit approval.** Paper only; no live trading is implied.
 1. `src/config.py` `BEAR`: `dd_enter=0.125`, `dd_exit=0.05`. Nothing else in the
    strategy changes. Keep the decision on the **daily close** (Cycle 39: a 4h-checked
    breaker whipsaws).
-2. The guards that pin the old rule (they exist to stop an *unapproved* switch).
-   Update their expected value in the same commit:
-   - `tests/test_exit_sweep.py`
-   - `tests/test_exit_cross_coin.py`
-   - `tests/test_exit_4h_stress.py`
-   - `tests/test_shadow_exit_book.py` ("official records carry their breaker params")
+2. The **one** guard that pins the old rule. It exists to stop an *unapproved*
+   switch. Update its expected value in the same commit:
+   - `tests/test_exit_sweep.py`, the last check ("live config unchanged ...").
+     Change `(0.20, 0.10)` to `(0.125, 0.05)`.
+
+   Since Cycle 44 (2026-10-17) nothing else depends on `config.BEAR`:
+   - The evidence scripts (`exit_sweep`, `exit_cross_coin`, `exit_4h_stress`) pin
+     their 20/10 baseline, so they still reproduce the Cycle 29/37/39 numbers after
+     a switch, labelled "base 20/10".
+   - The shadow test pins its synthetic official book to 20/10.
+   - Dry run (Cycle 44): config switched in a throwaway worktree, all 13 test files
+     run, and only this guard failed.
 
 ## What does NOT change
 - **The official ledger stays continuous.** It is not reset. Since Cycle 40 every
@@ -35,7 +41,12 @@ After a switch the shadow (12.5/5) duplicates the official book. Options:
 - **retire it.** Stop calling `shadow_book.py` from the paper daemon tick and keep
   its files as the record of the trial period.
 - **flip it to the old rule.** Set `OVERRIDE` to 20/10, with a new `BOOK` name and a
-  fresh directory. The old rule then keeps running as a control.
+  fresh directory. The old rule then keeps running as a control. The shadow-specific
+  checks in `tests/test_shadow_exit_book.py` must change in the same commit:
+  - the params are 12.5/5;
+  - the shadow exits earlier;
+  - the journal shows the 12.5% trigger text;
+  - the book name.
 
 ## Evidence summary (see research/RESEARCH_LOG.md)
 - maxDD cut is robust. It holds in the BTC backtest (46.7% → 28.5%), over 13/13

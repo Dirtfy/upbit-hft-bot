@@ -38,6 +38,9 @@ REAL = [os.path.join(ROOT, "paper_trading", f) for f in
         ("paper_log.jsonl", "JOURNAL.md", "SUMMARY.md", "market_data_daily.csv")]
 before = [open(p, "rb").read() if os.path.exists(p) else None for p in REAL]
 real_globals = {k: getattr(pt, k) for k in dir(pt) if k.endswith("_PATH")}
+# the test's official book runs the pre-switch 20/10 rule, so the scenario (and
+# these checks) hold whether or not config.BEAR has been switched (SWITCH_RUNBOOK)
+config.BEAR = dict(config.BEAR, dd_enter=0.20, dd_exit=0.10)
 real_bear = config.BEAR
 
 check("every paper_trader *_PATH global is redirected by the shadow book",
@@ -109,7 +112,7 @@ check("shadow journal is labelled as not official",
       "공식 원장이 아님" in open(sb.PATHS["JOURNAL_PATH"]).read())
 
 # ---- Cycle 40: labels follow the rule that made each record (10/24 switch-safe)
-check("official records carry their breaker params (20/10 today)",
+check("official records carry the breaker params they ran with (20/10 here)",
       all(r["params"] == {"dd_enter": 0.20, "dd_exit": 0.10} for r in off))
 sj = open(sb.PATHS["JOURNAL_PATH"]).read()
 check("shadow journal trigger text uses its own 12.5%/5% (no string patch)",

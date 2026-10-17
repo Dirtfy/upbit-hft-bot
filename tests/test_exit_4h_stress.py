@@ -11,7 +11,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "backtest"))
-import config                 # noqa: E402
 import bear_strategy as bs    # noqa: E402
 import exit_4h_stress as st   # noqa: E402
 
@@ -50,8 +49,8 @@ check("4h-checked breaker reacts at least as often as the daily rule", len(swi) 
 rows = st.run(dbars, h4)
 check("7 tests x 2 configs, 4h maxDD >= day-end maxDD",
       len(rows) == 14 and all(r["mdd_4h"] >= r["mdd"] - 1e-12 for r in rows))
-check("live config unchanged (proposal, not a switch)",
-      (config.BEAR["dd_enter"], config.BEAR["dd_exit"]) == (0.20, 0.10))
+check("configs pinned to 20/10 vs 12.5/5 (independent of config)",
+      st.CONFIGS == {"base 20/10": (0.20, 0.10), "cand 12.5/5": (0.125, 0.05)})
 
 ok = all(c for _, c in checks)
 print(f"\n{sum(c for _, c in checks)}/{len(checks)} passed")

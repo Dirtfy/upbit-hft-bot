@@ -1491,3 +1491,23 @@ Ops note: the Donchian book has been unchanged since 10-13 because it exited to 
 Before writing it, I re-ran exit_sweep, exit_cross_coin (data now to 10-15) and exit_4h_stress. Every figure cited matches the logged results to 0.1 points, so the brief cites reproducible numbers. The final forward figures will come from PERIOD_REPORT (FINAL) after the 10-25 00:05 UTC tick.
 
 Ops: the "WARN replay drift 128 KRW" lines in collect_4h_daemon.log are all from 10-06 and were fixed in Cycle 33. None have appeared since.
+
+## Cycle 44 (2026-10-17): switch rehearsal, which leaves one guard instead of four
+I rehearsed SWITCH_RUNBOOK in a throwaway git worktree: set config.BEAR to 12.5/5 and ran all 13 test files. The runbook understated the work:
+- test_exit_sweep crashed with a bare StopIteration, because its grid had no "live" point.
+- test_shadow_exit_book had 3 failures, not the 1 listed. Its synthetic official book used config.BEAR, so "the shadow exits earlier" lost its premise.
+- One crash-order check compared 12.5/5 against config.BEAR.
+- A silent problem: exit_cross_coin and exit_4h_stress read their baseline from config.BEAR. After a switch they would have compared 12.5/5 with itself while still printing "live 20/10".
+
+Fixes:
+- The three evidence scripts pin BASELINE = (0.20, 0.10). The sweep flags a "base" row separately from "live", and raises ValueError if the baseline is not in its grid. The 4h-stress label is now "base 20/10".
+- The shadow test pins its synthetic official book to 20/10.
+- The config guards in cross-coin and 4h-stress were replaced with checks that the pins hold.
+- The only remaining switch guard is the last check in test_exit_sweep.
+
+Re-rehearsal: after the switch, only that one guard fails and the other 12 files pass. On the current config every test passes. The evidence numbers are unchanged:
+- base 22.4% CAGR / 46.7% maxDD vs candidate 28.9% / 28.5%;
+- cross-coin non-BTC wins: CAGR 1, maxDD 5, Sharpe 1;
+- 4h stress: the candidate beats the baseline at fill +0h and under the 4h-checked breaker.
+
+SWITCH_RUNBOOK and DECISION_BRIEF were updated to match. No config change; research/paper only.

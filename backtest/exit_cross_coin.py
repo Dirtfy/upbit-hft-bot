@@ -32,7 +32,8 @@ import config                                     # noqa: E402
 import bear_strategy as bs                        # noqa: E402
 from bear_backtest import metrics                 # noqa: E402
 
-CANDIDATE = (0.125, 0.05)
+BASELINE = (0.20, 0.10)                           # Cycle 29 reference; pinned, not config.BEAR,
+CANDIDATE = (0.125, 0.05)                         # so the evidence reproduces after a switch
 PLATEAU = [(de, dx) for de in (0.11, 0.12, 0.13, 0.14, 0.15, 0.16) for dx in (0.04, 0.05, 0.06)]
 MIN_DAYS = 600                                    # 365-bar dd window + 200 SMA need history
 MIN_HOURS = 20                                    # drop a day with too few 1h bars
@@ -69,8 +70,7 @@ def run(bars, de, dx, capital=1_000_000.0):
 
 
 def coin_report(bars):
-    live = (config.BEAR["dd_enter"], config.BEAR["dd_exit"])
-    base, cand = run(bars, *live), run(bars, *CANDIDATE)
+    base, cand = run(bars, *BASELINE), run(bars, *CANDIDATE)
     plateau = [run(bars, de, dx) for de, dx in PLATEAU]
     return {
         "base": base, "cand": cand,
@@ -98,7 +98,7 @@ def main():
         r = coin_report(bars)
         r.update(coin=coin, n=len(bars), start=bars[0]["t"][:10], end=bars[-1]["t"][:10])
         rows.append(r)
-    print(f"long_flat, live {config.BEAR['dd_enter']:.1%}/{config.BEAR['dd_exit']:.0%} "
+    print(f"long_flat, baseline {BASELINE[0]:.1%}/{BASELINE[1]:.0%} "
           f"vs candidate {CANDIDATE[0]:.1%}/{CANDIDATE[1]:.0%}; daily from 1h, next-open fills, fees\n")
     print(f"{'coin':<9}{'days':>5} {'span':<23}{'B&H%':>8} | {'CAGR% L/C':>13}{'maxDD% L/C':>13}"
           f"{'Sharpe L/C':>12}{'trd L/C':>9} | {'plateau Shrp+':>13}{'MDD+':>6}")

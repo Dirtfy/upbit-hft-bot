@@ -44,12 +44,12 @@ for i in range(1500):
     d = f"{2019 + i // 365}-{(i % 365) // 31 + 1:02d}-{(i % 31) + 1:02d}T00:00:00"
     bars.append({"t": d, "open": px, "high": px * 1.01, "low": px * 0.99, "close": px})
 r = xc.coin_report(bars)
-eq0, _, tr0 = bs.replay(bars, dict(config.BEAR), "long_flat", 1_000_000.0)
-check("live row equals the live-config replay",
+eq0, _, tr0 = bs.replay(bars, dict(config.BEAR, dd_enter=0.20, dd_exit=0.10), "long_flat", 1_000_000.0)
+check("base row equals the pinned 20/10 replay (independent of config)",
       abs(r["base"]["final"] - eq0[-1]) < 1e-6 and r["base"]["trades"] == len(tr0))
 check("plateau is the Cycle 29 region (6 x 3)", r["plateau_n"] == 18)
-check("live config unchanged (proposal, not a switch)",
-      (config.BEAR["dd_enter"], config.BEAR["dd_exit"]) == (0.20, 0.10))
+check("baseline pinned to 20/10 and candidate to 12.5/5",
+      xc.BASELINE == (0.20, 0.10) and xc.CANDIDATE == (0.125, 0.05))
 
 ok = all(c for _, c in checks)
 print(f"\n{sum(c for _, c in checks)}/{len(checks)} passed")
